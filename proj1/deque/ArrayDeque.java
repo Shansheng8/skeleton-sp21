@@ -73,6 +73,7 @@ public class ArrayDeque<T> {
         T tmp = arr[(front + 1) % length];
         arr[(front + 1) % length] = null;
         front = (front + 1) % length;
+        size --;
         return tmp;
     }
 
@@ -83,6 +84,7 @@ public class ArrayDeque<T> {
         T tmp = arr[(last - 1 + length) % length];
         arr[(last - 1 + length) % length] = null;
         last = (last - 1 + length) % length;
+       size --;
         return tmp;
     }
 
