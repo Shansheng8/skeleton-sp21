@@ -1,6 +1,7 @@
 package deque;
 
-public class ArrayDeque<T> implements Deque<T> {
+import java.util.Iterator;
+public class ArrayDeque<T> implements Deque<T>, Iterable<T> {
     private T[] arr;
     private int length;
     private int size;
@@ -99,12 +100,52 @@ public class ArrayDeque<T> implements Deque<T> {
         return arr[pos];
     }
 
-    /* To learn , same as the LinkedListDeque
     public Iterator<T> iterator(){
-
+        return new ADequeIterator();
     }
 
-    public boolean equals(Object o){
+    private class ADequeIterator implements Iterator<T>{
+        int pos;
+        public ADequeIterator(){
+            pos = 0;
+        }
+        @Override
+        public boolean hasNext() {
+            return pos < size;
+        }
 
-    }*/
+        @Override
+        public T next() {
+            T tmp = get(pos);
+            pos ++;
+            return tmp;
+        }
+    }
+
+    @Override
+    public boolean equals(Object o){
+        //check whether the classes are the same
+        if (o instanceof ArrayDeque other){
+            //check the size
+            if (other.size != this.size){
+                return false;
+            }
+
+            //check the elements in the array
+            for (Object tmp : other){
+                return this.contains(tmp);
+            }
+
+        }
+        return false;
+    }
+
+    private boolean contains(Object tmp) {
+        for (T t : this){
+            if (t == tmp){
+                return true;
+            }
+        }
+        return false;
+    }
 }
