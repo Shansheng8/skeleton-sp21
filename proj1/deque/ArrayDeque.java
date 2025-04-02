@@ -18,14 +18,11 @@ public class ArrayDeque<T> implements Deque<T>, Iterable<T> {
     /*
         using System.arrcopy to larger the array
      */
-    private void resize(){ // 不能裸露地使用泛型数组，要上升一个抽象，因为fron不一定就是从数组最右侧往左移动，也可以RemoveFirst让其跑到最左侧
+    private void resize(){ //just use last when call add/removeLast ,and use front when call add/removeFirst
         T[] t = (T[]) new Object[size * 2];
         length *= 2;
-        /*the bug needs to fix ,remove this line after fix the problem
-          consider the sentence above
-         */
-        System.arraycopy(arr, front + 1, t, 0, size - front - 1);//if front + 1 if bigger than length - 1, will error
-        System.arraycopy(arr, 0, t, size - front, front + 1);
+        System.arraycopy(arr, (front + 1) % length, t, 0, size - (front + 1) % length);//if front + 1 if bigger than length - 1, will error
+        System.arraycopy(arr, 0, t, size - (front + 1) % length, last);
         front = length - 1;
         last = size;
         arr = t;
@@ -58,7 +55,7 @@ public class ArrayDeque<T> implements Deque<T>, Iterable<T> {
 
     @Override
     public void printDeque(){
-        for (int i = front + 1; i < length; i ++){
+        for (int i = (front + 1) % length; i < length; i ++){
             System.out.print(arr[i]);
         }
         for (int i = 0; i <last; i ++){
@@ -87,7 +84,7 @@ public class ArrayDeque<T> implements Deque<T>, Iterable<T> {
         T tmp = arr[(last - 1 + length) % length];
         arr[(last - 1 + length) % length] = null;
         last = (last - 1 + length) % length;
-       size --;
+        size --;
         return tmp;
     }
 
