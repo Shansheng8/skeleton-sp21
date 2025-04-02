@@ -109,7 +109,7 @@ public class LinkedListDeque<T> implements Deque<T> , Iterable<T>{
         if (index > size - 1 || index  < 0){
             return null;
         }
-        return  getRecursive_helper(sentinel, index);
+        return  getRecursive_helper(sentinel.next, index);
     }
 
     public Iterator<T> iterator(){
@@ -145,6 +145,10 @@ public class LinkedListDeque<T> implements Deque<T> , Iterable<T>{
         //check whether the classes are the same
         if (o instanceof Deque){
             //check the size
+            if (o == this){
+                return true;
+            }
+
             if (((Deque<?>) o).size() != this.size){
                 return false;
             }

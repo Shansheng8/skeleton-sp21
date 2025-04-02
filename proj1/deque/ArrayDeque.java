@@ -34,7 +34,7 @@ public class ArrayDeque<T> implements Deque<T>, Iterable<T> {
             resize();
         }
         arr[front] = item;
-        front --;
+        front = (front - 1 + length) % length; //the bound, if we just add the elements , the front will out of the bounds
         size ++;
     }
 
@@ -44,7 +44,7 @@ public class ArrayDeque<T> implements Deque<T>, Iterable<T> {
             resize();
         }
         arr[last] = item;
-        last ++;
+        last = (last + 1) % length; // also for last
         size ++;
     }
     
@@ -124,6 +124,10 @@ public class ArrayDeque<T> implements Deque<T>, Iterable<T> {
         //o is considered equal if it is a Deque
         // and if it contains the same contents (as governed by the generic T’s equals method) in the same order.
         //check whether the classes are the same
+        if (o == this){
+            return true;
+        }
+
         if (o instanceof Deque){
             //check the size
             if (((Deque<?>) o).size() != this.size){

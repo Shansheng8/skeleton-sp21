@@ -101,4 +101,28 @@ public class ArrayDequeTest {
         ad.addFirst(10);
         assertEquals(true, ad.get(0) == 10);
     }
+
+    @Test
+    public void removeTest() {
+        ArrayDeque<Integer> ad = new ArrayDeque<>();
+        ad.addLast(1);
+        ad.addLast(2);
+        ad.addLast(3);
+        ad.addLast(4);
+        ad.addLast(5);
+        ad.addLast(6);
+        ad.addLast(7);
+        ad.addLast(8);
+        ad.removeFirst();
+        ad.removeFirst();
+        assertEquals(true, ad.get(0) == 3);
+        ad.removeLast();
+        ad.removeLast();
+        ad.removeLast();
+        ad.removeLast();
+        assertEquals(true, ad.get(1) == 4);
+        ad.removeLast();
+        ad.removeLast();
+        assertEquals(true, ad.removeLast() == null);
+    }
 }
