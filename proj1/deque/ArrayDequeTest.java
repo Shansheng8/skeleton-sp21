@@ -17,9 +17,21 @@ public class ArrayDequeTest {
         assertNotEquals(ad1, ad2);
 
         ad2.addLast(1);
-        assertEquals(ad1, ad2);
+        assertNotEquals(ad1, ad2);
 
         LinkedListDeque<Integer> lld = new LinkedListDeque<>();
-        assertNotEquals(ad1, lld);
+        lld.addLast(1);
+        lld.addLast(2);
+        assertEquals(ad1, lld);
+    }
+
+    @Test
+    public void iteratorTest(){
+        ArrayDeque<Integer> ad = new ArrayDeque<>();
+        int p = 1;
+        for (int t : ad){
+            assertEquals(true, t == p);
+            p ++;
+        }
     }
 }

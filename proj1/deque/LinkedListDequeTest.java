@@ -144,9 +144,24 @@ public class LinkedListDequeTest {
         assertNotEquals(lld1, lld2);
 
         lld2.addLast(1);
-        assertEquals(lld1, lld2);
+        assertNotEquals(lld1, lld2);
 
         ArrayDeque<Integer> ad = new ArrayDeque<>();
-        assertNotEquals(lld1, ad);
+        ad.addLast(1);
+        ad.addLast(2);
+        assertEquals(true,lld1.equals(ad));
+    }
+
+    @Test
+    public void iteratorTest(){
+        LinkedListDeque<Integer> lld1 = new LinkedListDeque<>();
+        lld1.addLast(1);
+        lld1.addLast(2);
+        lld1.addLast(3);
+        int p = 1;
+        for (int t : lld1){
+            assertEquals(true, t == p);
+            p ++;
+        }
     }
 }

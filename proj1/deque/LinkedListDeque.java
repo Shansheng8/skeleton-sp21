@@ -86,7 +86,7 @@ public class LinkedListDeque<T> implements Deque<T> , Iterable<T>{
         if (index > size - 1 || index < 0){
             return null;
         }
-        Node tmp = sentinel;
+        Node tmp = sentinel.next;
         int t = 0;
         while (t != index){
             tmp = tmp.next;
@@ -140,28 +140,22 @@ public class LinkedListDeque<T> implements Deque<T> , Iterable<T>{
 
     @Override
     public boolean equals(Object o){
+        //o is considered equal if it is a Deque
+        // and if it contains the same contents (as governed by the generic T’s equals method) in the same order.
         //check whether the classes are the same
-        if (o instanceof LinkedListDeque){
+        if (o instanceof Deque){
             //check the size
-            LinkedListDeque<T> other = (LinkedListDeque<T>) o;
-            if (other.size() != this.size){
+            if (((Deque<?>) o).size() != this.size){
                 return false;
             }
 
-            //check the elements in the array
-            for (Object tmp : other){
-                return this.contains(tmp);
+            for (int i = 0; i < this.size; i ++){
+                if (((Deque<?>) o).get(i) != this.get(i)){
+                    return false;
+                }
             }
+            return true;
 
-        }
-        return false;
-    }
-
-    private boolean contains(Object tmp) {
-        for (T t : this){
-            if (t == tmp){
-                return true;
-            }
         }
         return false;
     }
