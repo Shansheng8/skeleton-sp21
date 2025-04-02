@@ -74,9 +74,6 @@ public class ArrayDeque<T> implements Deque<T>, Iterable<T> {
         arr[(front + 1) % length] = null;
         front = (front + 1) % length;
         size --;
-        if (size * 2 < length){
-            resize(length / 2);
-        }
         return tmp;
     }
 
@@ -89,9 +86,6 @@ public class ArrayDeque<T> implements Deque<T>, Iterable<T> {
         arr[(last - 1 + length) % length] = null;
         last = (last - 1 + length) % length;
         size --;
-        if (size * 2 < length){
-            resize(length / 2);
-        }
         return tmp;
     }
 
