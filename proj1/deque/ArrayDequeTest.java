@@ -125,4 +125,19 @@ public class ArrayDequeTest {
         ad.removeLast();
         assertEquals(true, ad.removeLast() == null);
     }
+
+    @Test
+    public void equalsTest() {
+        ArrayDeque<Double> ad1 = new ArrayDeque<>();
+        ad1.addLast(1.0);
+        ad1.addLast(2.0);
+        ad1.addLast(3.0);
+        ad1.addLast(4.0);
+        ArrayDeque<Integer> ad2 = new ArrayDeque<>();
+        ad2.addLast(1);
+        ad2.addLast(3);
+        ad2.addLast(3);
+        ad2.addLast(4);
+        assertNotEquals(ad1, ad2);
+    }
 }
