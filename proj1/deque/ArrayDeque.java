@@ -20,9 +20,10 @@ public class ArrayDeque<T> implements Deque<T>, Iterable<T> {
      */
     private void resize(){ //just use last when call add/removeLast ,and use front when call add/removeFirst
         T[] t = (T[]) new Object[size * 2];
-        length *= 2;
+       // length *= 2; shouldn't change length so early, we should use the length variable to calculate the length of the string
         System.arraycopy(arr, (front + 1) % length, t, 0, size - (front + 1) % length);//if front + 1 if bigger than length - 1, will error
         System.arraycopy(arr, 0, t, size - (front + 1) % length, last);
+        length *= 2;
         front = length - 1;
         last = size;
         arr = t;
