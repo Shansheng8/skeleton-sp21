@@ -21,8 +21,9 @@ public class ArrayDeque<T> implements Deque<T>, Iterable<T> {
     private void resize(int capacity){ //just use last when call add/removeLast ,and use front when call add/removeFirst
         T[] t = (T[]) new Object[capacity];
        // length *= 2; shouldn't change length so early, we should use the length variable to calculate the length of the string
-        System.arraycopy(arr, (front + 1) % length, t, 0, size - (front + 1) % length);//if front + 1 if bigger than length - 1, will error
-        System.arraycopy(arr, 0, t, size - (front + 1) % length, last);
+        for (int i = 0; i < size; i ++) {
+            t[i] = arr[(front + 1 + i) % length];
+        }
         length = capacity;
         front = length - 1;
         last = size;
@@ -70,6 +71,9 @@ public class ArrayDeque<T> implements Deque<T>, Iterable<T> {
         if (isEmpty()){
             return null;
         }
+        if (size * 4 < length){
+            resize(length / 2);
+        }
         T tmp = arr[(front + 1) % length];
         arr[(front + 1) % length] = null;
         front = (front + 1) % length;
@@ -81,6 +85,9 @@ public class ArrayDeque<T> implements Deque<T>, Iterable<T> {
     public T removeLast(){
         if (isEmpty()){
             return null;
+        }
+        if (size * 4 < length){
+            resize(length / 2);
         }
         T tmp = arr[(last - 1 + length) % length];
         arr[(last - 1 + length) % length] = null;
