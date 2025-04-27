@@ -27,8 +27,8 @@ public class Commit implements Serializable {
      */
 
     /** The message of this Commit. */
-    private final String message;//log信息
-    private  String date;//创建时间
+    public final String message;//log信息
+    public  String date;//创建时间
     public  List<Commit> parents;//父提交
     public  Map<String, Blob> blobs;//被跟踪的文档（工作目录下）到.gitlet下存储的blob之间的映射
     /* TODO: fill in the rest of this class. */
@@ -59,10 +59,10 @@ public class Commit implements Serializable {
     private void updateBlobs() {//更新Blob列表
         this.blobs = getParentCommit().blobs;
         File fr = join(Repository.GITLET_DIR,"rmstage");
-        List<String> rm = plainFilenamesIn(fr);
         File fa = join(Repository.GITLET_DIR,"addstage");
         List<String> addstage = plainFilenamesIn(fa);
-        if (rm == null && addstage == null) {
+        List<String> rm = plainFilenamesIn(fr);
+        if ((rm == null || rm.isEmpty()) && (addstage == null || addstage.isEmpty())) {
             System.out.println("No changes added to the commit.");
             System.exit(0);
         }

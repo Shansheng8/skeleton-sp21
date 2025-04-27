@@ -139,7 +139,47 @@ public class Repository {
         }
     }
 
+    public static void log() {
+        File f = join(GITLET_DIR,"HEAD");
+        String head = readContentsAsString(f);
+        f = join(GITLET_DIR,"object",head);
+        Commit commit = readObject(f, Commit.class);
+
+        while (commit != null && !commit.date.equals("00:00:00 UTC, Thursday, 1 January 1970")) {
+            if (commit.parents.size() == 1) {
+                printLog(commit);
+            }else {
+
+            }
+            commit = commit.parents.get(0);
+        }
+        printLog(commit);
+    }
+
     /*工具类方法*/
+    private static String readCommitAsString(Commit commit) {
+        return sha1(commit.message,commit.date,commit.parents.toString(),commit.blobs.toString());
+    }
+
+    private static void printmergeLog(Commit commit) {
+        System.out.println("===");
+        System.out.println("commit " + readCommitAsString(commit));
+        String c1 = readCommitAsString(commit.parents.get(0)), c2 = readCommitAsString(commit.parents.get(1));
+        String parentsinfo = c1.substring(0,7) + " " + c2.substring(0,7);
+        System.out.println("Merge: " + parentsinfo);
+        System.out.println("Date: " + commit.date);
+        System.out.println(commit.message);
+        System.out.println();
+    }
+
+    private static void printLog(Commit commit) {
+        System.out.println("===");
+        System.out.println("commit " + readCommitAsString(commit));
+        System.out.println("Date: " + commit.date);
+        System.out.println(commit.message);
+        System.out.println();
+    }
+
     private static boolean inCommit(Blob blob) {//检查该文档是否在当前HEAD指向的commit中
         File head = join(Repository.GITLET_DIR, "HEAD");
         String Head = readContentsAsString(head);
@@ -172,7 +212,7 @@ public class Repository {
             }catch (IOException ignore){
             }
         }
-        writeContents(file,blob.contents);//向addstage中写入对应的内容
+        writeObject(file,blob);//向addstage中写入对应的内容
     }
 
     private static void rmBlob(Blob blob, File f) {
