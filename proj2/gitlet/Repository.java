@@ -144,13 +144,8 @@ public class Repository {
         String head = readContentsAsString(f);
         f = join(GITLET_DIR,"object",head);
         Commit commit = readObject(f, Commit.class);
-
-        while (commit != null && !commit.date.equals("00:00:00 UTC, Thursday, 1 January 1970")) {
-            if (commit.parents.size() == 1) {
-                printLog(commit);
-            }else {
-
-            }
+        while (commit != null && !commit.date.equals("08:00:00 UTC, Thursday, 1 January 1970")) {
+            printLog(commit);
             commit = commit.parents.get(0);
         }
         printLog(commit);

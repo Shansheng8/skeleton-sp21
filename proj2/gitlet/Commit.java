@@ -5,6 +5,7 @@ package gitlet;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -79,14 +80,14 @@ public class Commit implements Serializable {
         }
     }
 
-    private static String dateToString(Date date) {//将date转为符合规范的字符串
-        SimpleDateFormat dateFormat = new SimpleDateFormat("EEE MMM d HH:mm:ss yyyy Z");
+    private static String dateToString(Date date) {
+        DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss 'UTC', EEEE, d MMMM yyyy", Locale.US);
         return dateFormat.format(date);
     }
 
     /* 用于init */
     public static void initialCommit() {//初始化第一个commit
-        Commit init = new Commit("Initial commit");
+        Commit init = new Commit("initial commit");
         init.date = dateToString(new Date(0));
         init.commit();
     }
