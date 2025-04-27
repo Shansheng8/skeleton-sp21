@@ -24,6 +24,9 @@ public class Main {
                 break;
             // TODO: FILL THE REST IN
             case "commit":
+                Commit commit = new Commit(args[1]);
+                commit.updateCommit();
+                commit.commit();
                 break;
             case "rm":
                 Repository.rmFile(args[1]);

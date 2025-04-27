@@ -3,6 +3,7 @@ package gitlet;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import static gitlet.Utils.*;
 // TODO: any imports you need here
@@ -144,13 +145,8 @@ public class Repository {
         String Head = readContentsAsString(head);
         File f = join(Repository.GITLET_DIR,"object",Head);
         Commit cur = readObject(f,Commit.class);//查找到当前指向的commit
-        List<String> blobID = cur.blobID;
-        for (String s : blobID) {
-            if (s.equals(blob.hashvalue)) {//当前commit中已经保存了该文档
-                return true;
-            }
-        }
-        return false;
+        Map<String,Blob> blobs = cur.blobs;
+        return blobs.containsKey(blob.hashvalue);
     }
 
     private static boolean inAddStage(Blob blob) {//检查addstage中是否已经在addstage中

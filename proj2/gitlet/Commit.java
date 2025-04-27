@@ -6,9 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date; // TODO: You'll likely use this in this class
-import java.util.List;
+import java.util.*;
 
 import static gitlet.Utils.*;
 
@@ -30,50 +28,83 @@ public class Commit implements Serializable {
 
     /** The message of this Commit. */
     private final String message;//log信息
-    private final String date;//创建时间
-    public final List<Commit> parents;//父提交
-    public final List<String> blobID;//
+    private  String date;//创建时间
+    public  List<Commit> parents;//父提交
+    public  Map<String, Blob> blobs;//被跟踪的文档（工作目录下）到.gitlet下存储的blob之间的映射
     /* TODO: fill in the rest of this class. */
 
     /* 用于构建Commit实例 */
-    public Commit(String message, String date) {
-        this.message = message;
-        this.date = date;
-        this.parents = new ArrayList<>();
-        this.blobID = new ArrayList<>();
-        getParents();
-        getBlobID();
-    }
-    //TODO：可能有两个父commit
-    private void getParents() {
-        File f = join(Repository.GITLET_DIR,"ref/heads/master");
-        if (readContentsAsString(f).equals("")) {
-            return;
+    public Commit(String message) {
+        if (message.isEmpty()) {
+            System.out.println("Please enter a commit message.");
+            System.exit(0);
         }
-        File commitfile = join(Repository.GITLET_DIR,"object",readContentsAsString(f));
-        Commit parent = readObject(commitfile,Commit.class);
-        this.parents.add(parent);
-    }
-    //TODO:
-    private void getBlobID() {
-        return;
+        this.message = message;
+        this.date = dateToString(new Date());
+        this.parents = new ArrayList<>();
+        this.blobs = new HashMap<>();
     }
 
-    private static String dateToString(Date date) {//将date转为字符串
+    private static Commit getParentCommit() {//获取父提交
+        File f = join(Repository.GITLET_DIR,"HEAD");
+        String head = readContentsAsString(f);
+        f = join(Repository.GITLET_DIR,"object",head);
+        return readObject(f,Commit.class);
+    }
+
+    private void updateParents() {//更新父提交
+        this.parents.add(getParentCommit());
+    }
+
+    private void updateBlobs() {//更新Blob列表
+        this.blobs = getParentCommit().blobs;
+        File fr = join(Repository.GITLET_DIR,"rmstage");
+        List<String> rm = plainFilenamesIn(fr);
+        File fa = join(Repository.GITLET_DIR,"addstage");
+        List<String> addstage = plainFilenamesIn(fa);
+        if (rm == null && addstage == null) {
+            System.out.println("No changes added to the commit.");
+            System.exit(0);
+        }
+        if (rm != null) {
+            for (String r : rm) {
+                this.blobs.remove(r);
+            }
+        }
+        if (addstage != null) {
+            for (String a : addstage) {
+                fa = join(Repository.GITLET_DIR,"addstage",a);
+                this.blobs.put(a,readObject(fa,Blob.class));
+            }
+        }
+    }
+
+    private static String dateToString(Date date) {//将date转为符合规范的字符串
         SimpleDateFormat dateFormat = new SimpleDateFormat("EEE MMM d HH:mm:ss yyyy Z");
         return dateFormat.format(date);
     }
 
     /* 用于init */
     public static void initialCommit() {//初始化第一个commit
-        String cur = dateToString(new Date(0));
-        Commit init = new Commit("Initial commit",cur);
-        commit(init);
+        Commit init = new Commit("Initial commit");
+        init.date = dateToString(new Date(0));
+        init.commit();
+    }
+
+    public void updateCommit() {
+
+        this.updateParents();
+        this.updateBlobs();
     }
 
     /* 用于提交commit*/
-    public static void commit(Commit commit) {//传入commit，将commit保存到object目录中进行存储
-        String filename = sha1(commit.message,commit.date,commit.parents.toString(),commit.blobID.toString());
+    /*
+        commit的属性有：提交的日志（log） 提交的时间（date）对应的父提交（可能有两个）对应的blobs（一般会包含多个）
+        完成提交的完整过程：复制其父提交，扫描addstage与rmstage区域修改对应的blobs，得到一个新的commit,
+        将其属性内容转为字符串后使用sha1加密得到对应的hash值，将该值作为文档名保存到object目录下
+     */
+    public void commit() {//传入commit，将commit保存到object目录中进行存储
+        String filename = sha1(this.message,this.date,this.parents.toString(),this.blobs.toString());
         File f = join(Repository.GITLET_DIR,"object",filename);//通过SHA-1加密后的字符串作为文档的名称
         if (!f.exists()) {
             try {
@@ -81,7 +112,7 @@ public class Commit implements Serializable {
             }catch (IOException ignore){
             }
         }
-        writeObject(f,commit);//将commit的信息保存到对应名称为sha1字符串的文档中
+        writeObject(f,this);//将commit的信息保存到对应名称为sha1字符串的文档中
         f = join(Repository.GITLET_DIR,"ref/heads/master");//修改master分支的末端所指向的commit
         writeContents(f,filename);
         f = join(Repository.GITLET_DIR,"HEAD");
