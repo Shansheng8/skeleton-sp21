@@ -138,20 +138,94 @@ public class Repository {
             }
         }
     }
-
+    /* 用于log*/
     public static void log() {
         File f = join(GITLET_DIR,"HEAD");
         String head = readContentsAsString(f);
         f = join(GITLET_DIR,"object",head);
         Commit commit = readObject(f, Commit.class);
         while (commit != null && !commit.date.equals("08:00:00 UTC, Thursday, 1 January 1970")) {
-            printLog(commit);
+            if (commit.parents.size() == 1) {
+                printLog(commit);
+            }else {
+                printmergeLog(commit);
+            }
             commit = commit.parents.get(0);
         }
         printLog(commit);
     }
+    /* 用于checkout*/
+    /*
+        checkout存在三种使用情况
+        注意checkout的目的是修改工作目录下的文档，因此不会涉及修改.gitlet目录下的文件
+        1. checkout -- [file name]
+            通过HEAD获取当前正在跟踪的commit,查找其中的blobs,
+            如果commit中没有对应的文档名，则报错
+            如果commit中有存在的文档名，若工作目录下存在该文档则覆盖，若没有则创建并将内容写入
+        2. checkout [commit id] -- [file name]
+            通过commit id找到对应的commit（此处会进行递归查找，注意base case）
+            如果没有查找到对应的commit,则报错
+            如果查找到则接下来过程与1.相同（也会有报错）
+        3. checkout [branch name]
+            查找.gitlet/ref/heads/下的指针，
+            如果查找不到该branch,则报错
+            如果该branch就是当前HEAD指向的branch则输出提示
+            如果在当前branch（还没进行branch变更）下有未提交的文档，并且进行checkout后会被删除（没有被变更后的branch跟踪），则报错
+            修改完工作目录下的文档后HEAD应指向该branch（不应该提前修改），并且清空saddstage以及rmstage,如果切换了branch
+     */
+    public static void checkoutFile(String filename) {
+        File f = join(GITLET_DIR,"HEAD");
+        String head = readContentsAsString(f);
+        f = join(GITLET_DIR,"object",head);
+        Commit cur = readObject(f, Commit.class);
+        //TODO: hashmap是通过blob内容生成的hash值作为键，现在无法通过filename进行搜索
+        //可以遍历map来查询是否存在该fil而？
+        if (!cur.blobs.containsKey(blob.hashvalue)) {
+            System.out.println("File does not exist in that commit.");
+        }
 
+    }
+    //TODO:
+    public static void checkoutCommitFile(String commitname, String filename) {
+
+    }
+    //TODO:
+    public static void checkoutBranch(String branchname) {
+
+    }
+    /* 用于branch*/
+    public static void branch(String name) {
+        File f = join(GITLET_DIR,"ref","heads",name);
+        if (f.exists()) {
+            System.out.println("A branch with that name already exists.");
+            System.exit(0);
+        }
+        try {
+            f.createNewFile();
+        }catch (IOException ignore) {
+        }
+    }
+    /* 用于rm-branch*/
+    /*
+        当不存在该分支时，报错
+        当该分支为当前工作分支时，报错
+     */
+    public static void rmbranch(String name) {
+        File f = join(GITLET_DIR,"ref","heads",name);
+        if (!f.exists()) {
+            System.out.println("A branch with that name does not exist.");
+            System.exit(0);
+        }
+        File hd = join(GITLET_DIR,"HEAD");
+        String head = readContentsAsString(hd);
+        if (name.equals(head)) {
+            System.out.println("Cannot remove the current branch.");
+            System.exit(0);
+        }
+        restrictedDelete(f);
+    }
     /*工具类方法*/
+
     private static String readCommitAsString(Commit commit) {
         return sha1(commit.message,commit.date,commit.parents.toString(),commit.blobs.toString());
     }

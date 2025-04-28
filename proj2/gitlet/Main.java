@@ -49,12 +49,29 @@ public class Main {
 
              */
             case "checkout":
+                switch (args.length) {
+                    case 2:
+                        Repository.checkoutBranch(args[1]);
+                        break;
+                    case 3:
+                        Repository.checkoutFile(args[2]);
+                        break;
+                    case 4:
+                        Repository.checkoutCommitFile(args[1], args[3]);
+                        break;
+                }
                 break;
-            /*
             case "branch":
+                // branch [branch name]
+                validateNumArgs("branch",args,2);
+                Repository.branch(args[1]);
                 break;
             case "rm-branch":
+                // rm-branch [branch name]
+                validateNumArgs("rm-branch",args,2);
+                Repository.rmbranch(args[1]);
                 break;
+            /*
             case "reset":
                 break;
             case "merge":
