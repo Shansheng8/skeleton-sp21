@@ -93,7 +93,6 @@ public class Commit implements Serializable {
     }
 
     public void updateCommit() {
-
         this.updateParents();
         this.updateBlobs();
     }

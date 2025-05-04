@@ -24,7 +24,6 @@ public class Main {
                 validateNumArgs("add",args,2);
                 Repository.addFile(args[1]);
                 break;
-            // TODO: FILL THE REST IN
             case "commit":
                 validateNumArgs("commit",args,2);
                 Commit commit = new Commit(args[1]);

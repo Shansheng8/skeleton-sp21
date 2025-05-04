@@ -2,6 +2,7 @@ package gitlet;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -173,25 +174,106 @@ public class Repository {
             如果在当前branch（还没进行branch变更）下有未提交的文档，并且进行checkout后会被删除（没有被变更后的branch跟踪），则报错
             修改完工作目录下的文档后HEAD应指向该branch（不应该提前修改），并且清空saddstage以及rmstage,如果切换了branch
      */
+
     public static void checkoutFile(String filename) {
-        File f = join(GITLET_DIR,"HEAD");
-        String head = readContentsAsString(f);
-        f = join(GITLET_DIR,"object",head);
-        Commit cur = readObject(f, Commit.class);
-        //TODO: hashmap是通过blob内容生成的hash值作为键，现在无法通过filename进行搜索
-        //可以遍历map来查询是否存在该fil而？
-        if (!cur.blobs.containsKey(blob.hashvalue)) {
-            System.out.println("File does not exist in that commit.");
-        }
-
+        Commit cur = getHead();
+        //遍历map搜索符合对应filename的blob
+        findFileInCommit(cur, filename);
     }
-    //TODO:
+    //TODO:还没考虑存在两个父提交的情况
     public static void checkoutCommitFile(String commitname, String filename) {
-
+        //先向上查找对应的commit（使用的name是对应的hash值）
+        Commit cur = getHead();
+        while (!cur.parents.isEmpty()) {
+            if (readCommitAsString(cur).equals(commitname)) {
+                findFileInCommit(cur, filename);
+                break;
+            }
+            cur = cur.parents.get(0);
+        }
+        System.out.println("No commit with that id exists.");
     }
-    //TODO:
-    public static void checkoutBranch(String branchname) {
+    /*
+            查找.gitlet/ref/heads/下的指针，
+            如果查找不到该branch,则报错
+            如果该branch就是当前HEAD指向的branch则输出提示
+            //TODO:
+            如果在当前branch（还没进行branch变更）下有未提交的文档，并且进行checkout后会被删除（没有被变更后的branch跟踪），则报错
+            修改完工作目录下的文档后HEAD应指向该branch（不应该提前修改），并且清空saddstage以及rmstage,如果切换了branch
+     */
 
+    private static void changeCWD(Commit commit) {
+        Commit head = getHead();
+        //先遍历CWD中的文档，
+        // 复制一个commit跟踪的blobs，如果该文档在被跟踪的blobs中则将复制的blobs中的该文档删除
+        List<String> filename = plainFilenamesIn(CWD);
+        Map<String,Blob> blobs = new HashMap<>(commit.blobs);//复制一份blobs，直接获取指针会影响本来的map
+        //都转为hash值
+        for (int i = 0; i < filename.size(); i++) {
+            String hashname = readFileInCWDWithSHA1(filename.get(i));
+            boolean inHead = head.blobs.containsKey(hashname), inCommit = head.blobs.containsKey(hashname);
+            File f = join(CWD,filename.get(i));
+            if (inHead && inCommit) {
+                writeContents(f,commit.blobs.get(hashname).contents);
+                blobs.remove(hashname);
+            }else if (inHead) {
+                restrictedDelete(f);
+            }else if (inCommit) {
+                writeContents(f,commit.blobs.get(hashname).contents);
+                blobs.remove(hashname);
+            }else {//两者都未进行跟踪，报错
+                System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+                System.exit(0);
+            }
+        }
+        //若当前branch跟踪了但是CWD中没有还得进行添加
+        blobs.forEach((k,v)->{
+            File f = join(CWD,k);
+            try{
+                f.createNewFile();
+            }catch (IOException ignore){}
+            writeContents(f,v.contents);
+        });
+    }
+
+    public static void checkoutBranch(String branchname) {
+        File f = join(GITLET_DIR,"ref","heads");
+        List<String> ref = plainFilenamesIn(f);
+        for (String refname : ref) {
+            if (refname.equals(branchname)) {
+                f = join(GITLET_DIR,"HEAD");
+                String head = readContentsAsString(f);
+                if (refname.equals(head)) {
+                    System.out.println("No need to checkout the current branch.");
+                    System.exit(0);
+                }
+                //获取要更改的branch指向的commit
+                f = join(GITLET_DIR,"object",refname);
+                Commit commit = readObject(f, Commit.class);
+                //修改CWD
+                changeCWD(commit);
+                //先通过.gitlet/ref/heads/branchname获取指向该commit的hash值，再将HEAD指向该commit
+                f  = join(GITLET_DIR,"ref","heads",refname);
+                String branch = readContentsAsString(f);
+                f = join(GITLET_DIR,"HEAD");
+                writeContents(f,branch);
+                //清空addstage
+                f = join(GITLET_DIR,"addstage");
+                List<String> add = plainFilenamesIn(f);
+                for (String addname : add) {
+                    f = join(f, addname);
+                    restrictedDelete(f);
+                }
+                //清空rmstage
+                f = join(GITLET_DIR,"rmstage");
+                List<String> rm = plainFilenamesIn(f);
+                for (String rmname : rm) {
+                    f = join(f, rmname);
+                    restrictedDelete(f);
+                }
+            }
+        }
+        System.out.println("No such branch exists.");
     }
     /* 用于branch*/
     public static void branch(String name) {
@@ -225,6 +307,41 @@ public class Repository {
         restrictedDelete(f);
     }
     /*工具类方法*/
+
+    /* checkout helper*/
+
+    private static String readFileInCWDWithSHA1(String filename) {
+        File f = join(CWD,filename);
+        String content = readContentsAsString(f);
+        return sha1(content);
+    }
+
+    private static void findFileInCommit(Commit commit, String filename) {
+        //通过filename获取CWD下该文档的内容，转为对应的hash值进行查找,
+        //如果commit中有存在的文档名，若工作目录下存在该文档则覆盖，若没有则创建并将内容写入
+        String filehash = readFileInCWDWithSHA1(filename);
+        if (commit.blobs.containsKey(filehash)) {
+            File f = join(CWD,filename);
+            if (!f.exists()) {
+                try{
+                    f.createNewFile();
+                }catch (IOException ignore) {}
+            }
+            writeContents(f,commit.blobs.get(filehash).contents);
+        }else {
+            System.out.println("File does not exist in that commit.");
+            System.exit(0);
+        }
+    }
+
+    private static Commit getHead() {
+        File f = join(GITLET_DIR,"HEAD");
+        String head = readContentsAsString(f);
+        f = join(GITLET_DIR,"object",head);
+        return readObject(f, Commit.class);
+    }
+
+    /* checkout helper end*/
 
     private static String readCommitAsString(Commit commit) {
         return sha1(commit.message,commit.date,commit.parents.toString(),commit.blobs.toString());
