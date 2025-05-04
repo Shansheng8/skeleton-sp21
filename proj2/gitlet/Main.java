@@ -16,26 +16,25 @@ public class Main {
         switch(firstArg) {
             case "init":
                 //handle the `init` command
-                validateNumArgs("init",args,1);
                 Repository.initializeRepo();
                 break;
             case "add":
                 // handle the `add [filename]` command
-                validateNumArgs("add",args,2);
                 Repository.addFile(args[1]);
                 break;
             case "commit":
-                validateNumArgs("commit",args,2);
+                if (args.length != 2) {
+                    System.out.println("Please enter a commit message.");
+                    System.exit(0);
+                }
                 Commit commit = new Commit(args[1]);
                 commit.updateCommit();
                 commit.commit();
                 break;
             case "rm":
-                validateNumArgs("rm",args,1);
                 Repository.rmFile(args[1]);
                 break;
             case "log":
-                validateNumArgs("log",args,1);
                 Repository.log();
                 break;
 
@@ -62,12 +61,10 @@ public class Main {
                 break;
             case "branch":
                 // branch [branch name]
-                validateNumArgs("branch",args,2);
                 Repository.branch(args[1]);
                 break;
             case "rm-branch":
                 // rm-branch [branch name]
-                validateNumArgs("rm-branch",args,2);
                 Repository.rmbranch(args[1]);
                 break;
             /*
@@ -77,13 +74,6 @@ public class Main {
                 break;
 
              */
-        }
-    }
-
-    public static void validateNumArgs(String cmd, String[] args, int n) {
-        if (args.length != n) {
-            throw new RuntimeException(
-                    String.format("Invalid number of arguments for: %s.", cmd));
         }
     }
 }

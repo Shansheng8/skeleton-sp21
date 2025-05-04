@@ -36,10 +36,6 @@ public class Commit implements Serializable {
 
     /* 用于构建Commit实例 */
     public Commit(String message) {
-        if (message.isEmpty()) {
-            System.out.println("Please enter a commit message.");
-            System.exit(0);
-        }
         this.message = message;
         this.date = dateToString(new Date());
         this.parents = new ArrayList<>();
@@ -117,5 +113,12 @@ public class Commit implements Serializable {
         writeContents(f,filename);
         f = join(Repository.GITLET_DIR,"HEAD");
         writeContents(f,filename);//修改HEAD指针指向的commit
+        //清理addstage区域
+        f = join(Repository.GITLET_DIR,"addstage");
+        List<String> add = plainFilenamesIn(f);
+        for (String addname : add) {
+            f = join(f, addname);
+            restrictedDelete(f);
+        }
     }
 }
