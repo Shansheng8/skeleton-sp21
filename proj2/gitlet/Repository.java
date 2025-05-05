@@ -187,7 +187,7 @@ public class Repository {
         while (!cur.parents.isEmpty()) {
             if (readCommitAsString(cur).equals(commitname)) {
                 findFileInCommit(cur, filename);
-                break;
+                System.exit(0);
             }
             cur = cur.parents.get(0);
         }
@@ -197,7 +197,6 @@ public class Repository {
             查找.gitlet/ref/heads/下的指针，
             如果查找不到该branch,则报错
             如果该branch就是当前HEAD指向的branch则输出提示
-            //TODO:
             如果在当前branch（还没进行branch变更）下有未提交的文档，并且进行checkout后会被删除（没有被变更后的branch跟踪），则报错
             修改完工作目录下的文档后HEAD应指向该branch（不应该提前修改），并且清空saddstage以及rmstage,如果切换了branch
      */
@@ -312,6 +311,10 @@ public class Repository {
 
     private static String readFileInCWDWithSHA1(String filename) {
         File f = join(CWD,filename);
+        if (!f.exists()) {
+            System.out.println("File does not exist in the CWD.");
+            System.exit(0);
+        }
         String content = readContentsAsString(f);
         return sha1(content);
     }
@@ -319,19 +322,22 @@ public class Repository {
     private static void findFileInCommit(Commit commit, String filename) {
         //通过filename获取CWD下该文档的内容，转为对应的hash值进行查找,
         //如果commit中有存在的文档名，若工作目录下存在该文档则覆盖，若没有则创建并将内容写入
-        String filehash = readFileInCWDWithSHA1(filename);
-        if (commit.blobs.containsKey(filehash)) {
-            File f = join(CWD,filename);
-            if (!f.exists()) {
-                try{
-                    f.createNewFile();
-                }catch (IOException ignore) {}
+        //TODO：不一定CWD下存在该文档
+
+        commit.blobs.forEach((k,v)->{
+            if (v.filename.equals(filename)) {
+                File f = join(CWD,filename);
+                if (!f.exists()) {
+                    try{
+                        f.createNewFile();
+                    }catch (IOException ignore) {}
+                }
+                writeContents(f,v.contents);
+                System.exit(0);
             }
-            writeContents(f,commit.blobs.get(filehash).contents);
-        }else {
-            System.out.println("File does not exist in that commit.");
-            System.exit(0);
-        }
+        });
+        System.out.println("File does not exist in that commit.");
+        System.exit(0);
     }
 
     private static Commit getHead() {
