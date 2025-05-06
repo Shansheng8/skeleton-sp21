@@ -39,15 +39,15 @@ public class Main {
             case "log":
                 Repository.log();
                 break;
-
-            /*case"global-log":
+            case"global-log":
+                Repository.globallog();
                 break;
             case "find":
+                Repository.find(args[1]);
                 break;
             case "status":
+                Repository.status();
                 break;
-
-             */
             case "checkout":
                 switch (args.length) {
                     case 2:
@@ -69,13 +69,11 @@ public class Main {
                 // rm-branch [branch name]
                 Repository.rmbranch(args[1]);
                 break;
-            /*
             case "reset":
+                Repository.reset(args[1]);
                 break;
             case "merge":
                 break;
-
-             */
         }
     }
 }

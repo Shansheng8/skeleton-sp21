@@ -42,9 +42,9 @@ public class Repository {
        |    -object 用于存储提交与文件
        |          -commits and blobs
        |    -ref/ 用于存储每个分支末端的指针
-       |        -heads/
+       |        -heads/ 指向当前分支
        |              -master
-       |              -...
+       |        -...
        |    -addstage 暂存区
        |    -rmstage  删除区
        |
@@ -154,7 +154,17 @@ public class Repository {
         printLog(commit);
     }
 
-    public static void printmergeLog(Commit commit) {
+    public static void globallog() {
+        File f = join(GITLET_DIR,"object");
+        List<String> object = plainFilenamesIn(f);
+        for (String obj : object) {
+            f = join(GITLET_DIR,"object",obj);
+            Commit commit = readObject(f, Commit.class);
+            printLog(commit);
+        }
+    }
+
+    private static void printmergeLog(Commit commit) {
         System.out.println("===");
         System.out.println("commit " + commit.hashname);
         String c1 = commit.parents.get(0).hashname, c2 = commit.parents.get(1).hashname;
@@ -165,13 +175,76 @@ public class Repository {
         System.out.println();
     }
 
-    public static void printLog(Commit commit) {
+    private static void printLog(Commit commit) {
         System.out.println("===");
         System.out.println("commit " + commit.hashname);
         System.out.println("Date: " + commit.date);
         System.out.println(commit.message);
         System.out.println();
     }
+
+    public static void find(String commitmessage) {
+        File f = join(GITLET_DIR,"object");
+        List<String> object = plainFilenamesIn(f);
+        int num = 0;
+        for (String obj : object) {
+            f = join(GITLET_DIR,"object",obj);
+            Commit commit = readObject(f, Commit.class);
+            if (commit.message.equals(commitmessage)) {
+                num ++;
+                System.out.println(commit.hashname);
+            }
+        }
+        if (num == 0) {
+            System.out.println("Found no commit with that message.");
+        }
+    }
+
+    public static void status() {
+        printBranches();
+        printStagedFiles();
+        printRmedFiles();
+        System.out.println("=== Modifications Not Staged For Commit ===\n\n=== Untracked Files ===");
+    }
+
+    private static void printBranches() {
+        System.out.println("=== Branches ===");
+        File head  = join(GITLET_DIR,"ref","heads");
+        List<String> hd = plainFilenamesIn(head);
+        System.out.print("*");
+        System.out.println(hd.get(0));
+        File f = join(GITLET_DIR,"ref");
+        List<String> ref = plainFilenamesIn(f);
+        for (String ponit : ref) {
+            System.out.println(ponit);
+        }
+        System.out.println();
+    }
+
+    private static void printStagedFiles() {
+        System.out.println("=== Staged Files ===");
+        File f = join(GITLET_DIR,"addstage");
+        List<String> add = plainFilenamesIn(f);
+        for (String name : add) {
+            f = join(GITLET_DIR,"addstage",name);
+            Blob blob = readObject(f, Blob.class);
+            System.out.println(blob.filename);
+        }
+        System.out.println();
+    }
+
+    private static void printRmedFiles() {
+        System.out.println("=== Removed Files ===");
+        File f = join(GITLET_DIR,"rmstage");
+        List<String> rm = plainFilenamesIn(f);
+        for (String name : rm) {
+            f = join(GITLET_DIR,"rmstage",name);
+            Blob blob = readObject(f,Blob.class);
+            System.out.println(blob.filename);
+        }
+        System.out.println();
+    }
+
     /* 用于checkout*/
     /*
         checkout存在三种使用情况
@@ -209,26 +282,51 @@ public class Repository {
     }
 
     public static void checkoutBranch(String branchname) {
-        File f = join(GITLET_DIR,"ref","heads");
+        //branchname不是指指向的commit的hash值！
+        File f = join(GITLET_DIR,"ref","heads",branchname);
+        if (f.exists()) {
+            System.out.println("No need to checkout the current branch.");
+            System.exit(0);
+        }
+        f = join(GITLET_DIR,"ref");
         List<String> ref = plainFilenamesIn(f);
+        boolean flag = false;
+        //在指针目录下找到目标branch
         for (String refname : ref) {
             if (refname.equals(branchname)) {
-                f = join(GITLET_DIR,"HEAD");
-                String head = readContentsAsString(f);
-                if (refname.equals(head)) {
-                    System.out.println("No need to checkout the current branch.");
-                    System.exit(0);
-                }
-                //获取要更改的branch指向的commit
-                f = join(GITLET_DIR,"object",refname);
+                flag = true;
+                f = join(GITLET_DIR,"ref",refname);
+                String commitname = readContentsAsString(f);
+                f = join(GITLET_DIR,"object",commitname);
                 Commit commit = readObject(f, Commit.class);
                 //修改CWD
                 changeCWD(commit);
-                //先通过.gitlet/ref/heads/branchname获取指向该commit的hash值，再将HEAD指向该commit
-                f  = join(GITLET_DIR,"ref","heads",refname);
-                String branch = readContentsAsString(f);
-                f = join(GITLET_DIR,"HEAD");
-                writeContents(f,branch);
+
+                //先将heads目录下的文档复制到ref目录下，再删除heads下的文档，将当前branch的文档写入
+                f  = join(GITLET_DIR,"ref","heads");
+                List<String> head = plainFilenamesIn(f);
+                String hd = head.get(0);//获取heads下文档的名称
+                //删除旧的head
+                f = join(GITLET_DIR,"ref","heads",hd);
+                String content = readContentsAsString(f);//获取heads下文档内容
+                restrictedDelete(f);//删除heads下的文档
+                //将旧head移到ref下
+                f = join(GITLET_DIR,"ref",hd);
+                try{
+                    f.createNewFile();
+                }catch (IOException ignore){}
+                writeContents(f,content);//在ref下复制一份heads下的文档
+                //删除ref下的branch
+                f = join(GITLET_DIR,"ref",branchname);
+                content = readContentsAsString(f);//获取要转到的branch的文档内容
+                restrictedDelete(f);//删除在ref下的该文档
+                //移动到heads下
+                f = join(GITLET_DIR,"ref","heads",branchname);
+                try{
+                    f.createNewFile();
+                }catch (IOException ignore){}
+                writeContents(f,content);//在heads下复制一份该branch的文档内容
+
                 //清空addstage
                 f = join(GITLET_DIR,"addstage");
                 List<String> add = plainFilenamesIn(f);
@@ -243,14 +341,24 @@ public class Repository {
                     f = join(f, rmname);
                     restrictedDelete(f);
                 }
+                break;
             }
         }
-        System.out.println("No such branch exists.");
+        if (!flag) {
+            System.out.println("No such branch exists.");
+        }
     }
 
     /* 用于branch*/
     public static void branch(String name) {
+        //先检查master是不是该branch
         File f = join(GITLET_DIR,"ref","heads",name);
+        if (f.exists()) {
+            System.out.println("A branch with that name already exists.");
+            System.exit(0);
+        }
+        //再检查ref下的其他branch
+        f = join(GITLET_DIR,"ref",name);
         if (f.exists()) {
             System.out.println("A branch with that name already exists.");
             System.exit(0);
@@ -259,6 +367,9 @@ public class Repository {
             f.createNewFile();
         }catch (IOException ignore) {
         }
+        File head = join(GITLET_DIR,"HEAD");
+        String Head = readContentsAsString(head);
+        writeContents(f,Head);
     }
     /* 用于rm-branch*/
     /*
@@ -267,16 +378,27 @@ public class Repository {
      */
     public static void rmbranch(String name) {
         File f = join(GITLET_DIR,"ref","heads",name);
+        if (f.exists()) {
+            System.out.println("Cannot remove the current branch.");
+            System.exit(0);
+        }
+        f = join(GITLET_DIR,"ref",name);
         if (!f.exists()) {
             System.out.println("A branch with that name does not exist.");
             System.exit(0);
         }
-        File hd = join(GITLET_DIR,"HEAD");
-        String head = readContentsAsString(hd);
-        if (name.equals(head)) {
-            System.out.println("Cannot remove the current branch.");
+        restrictedDelete(f);
+    }
+
+    public static void reset(String commitid) {
+        File f = join(GITLET_DIR,"object",commitid);
+        if (!f.exists()) {
+            System.out.println("No commit with that id exists.");
             System.exit(0);
         }
-        restrictedDelete(f);
+        Commit commit = readObject(f, Commit.class);
+        changeCWD(commit);
+        File head = join(GITLET_DIR,"HEAD");
+        writeContents(head,commitid);
     }
 }

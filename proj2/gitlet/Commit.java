@@ -67,13 +67,16 @@ public class Commit implements Serializable {
         }
         if (rm != null) {
             for (String r : rm) {
-                this.blobs.remove(r);
+                fr = join(fr,r);
+                Blob tmp = readObject(fr, Blob.class);
+                this.blobs.remove(tmp.filename);
             }
         }
         if (addstage != null) {
             for (String a : addstage) {
                 fa = join(Repository.GITLET_DIR,"addstage",a);
-                this.blobs.put(a,readObject(fa,Blob.class));
+                Blob tmp = readObject(fa, Blob.class);
+                this.blobs.put(tmp.filename,tmp);
             }
         }
     }

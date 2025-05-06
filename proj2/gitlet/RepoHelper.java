@@ -28,19 +28,18 @@ public class RepoHelper {
         // 复制一个commit跟踪的blobs，如果该文档在被跟踪的blobs中则将复制的blobs中的该文档删除
         List<String> filename = plainFilenamesIn(CWD);
         Map<String,Blob> blobs = new HashMap<>(commit.blobs);//复制一份blobs，直接获取指针会影响本来的map
-        //都转为hash值
         for (int i = 0; i < filename.size(); i++) {
-            String hashname = readFileInCWDWithSHA1(filename.get(i));
-            boolean inHead = head.blobs.containsKey(hashname), inCommit = head.blobs.containsKey(hashname);
-            File f = join(CWD,filename.get(i));
+            String fname = filename.get(i);
+            boolean inHead = head.blobs.containsKey(fname), inCommit = commit.blobs.containsKey(fname);
+            File f = join(CWD,fname);
             if (inHead && inCommit) {
-                writeContents(f,commit.blobs.get(hashname).contents);
-                blobs.remove(hashname);
+                writeContents(f,commit.blobs.get(fname).contents);
+                blobs.remove(fname);
             }else if (inHead) {
                 restrictedDelete(f);
             }else if (inCommit) {
-                writeContents(f,commit.blobs.get(hashname).contents);
-                blobs.remove(hashname);
+                writeContents(f,commit.blobs.get(fname).contents);
+                blobs.remove(fname);
             }else {//两者都未进行跟踪，报错
                 System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
                 System.exit(0);
@@ -81,35 +80,18 @@ public class RepoHelper {
         //通过filename获取CWD下该文档的内容，转为对应的hash值进行查找,
         //如果commit中有存在的文档名，若工作目录下存在该文档则覆盖，若没有则创建并将内容写入
         //不一定CWD下存在该文档
-        for (Map.Entry<String, Blob> entry : commit.blobs.entrySet()) {
-            Blob v = entry.getValue();
-            if (v.filename.equals(filename)) {
-                System.out.println("this is a test: Find the file correctly!!!");
-                File f = join(CWD, filename);
-                try {
-                    // 确保文件内容被正确写入
-                    if (!f.exists()) {
-                        f.createNewFile();
-                    }
-                    writeContents(f, v.contents);
-                    return;
-                } catch (IOException e) {
-                    System.out.println("Failed to create or write to file: " + e.getMessage());
-                    System.exit(1);  // 错误退出
+        Map<String,Blob> entry = commit.blobs;
+        if (entry.containsKey(filename)) {
+            File f = join(CWD, filename);
+            try {
+                if (!f.exists()) {
+                    f.createNewFile();
                 }
-            }
+                writeContents(f, entry.get(filename).contents);
+            } catch (IOException ignore) {}
+        }else {
+            System.out.println("File does not exist in that commit.");
         }
-        System.out.println("File does not exist in that commit.");
-    }
-
-    public static String readFileInCWDWithSHA1(String filename) {
-        File f = join(CWD,filename);
-        if (!f.exists()) {
-            System.out.println("File does not exist in the CWD.");
-            System.exit(0);
-        }
-        String content = readContentsAsString(f);
-        return sha1(content);
     }
 
     public static Commit getHead() {
