@@ -1,6 +1,7 @@
 package gitlet;
 
 import java.io.File;
+import java.util.Date;
 
 /** Driver class for Gitlet, a subset of the Git version-control system.
  *  @author TODO
@@ -27,7 +28,8 @@ public class Main {
                     System.out.println("Please enter a commit message.");
                     System.exit(0);
                 }
-                Commit commit = new Commit(args[1]);
+                String date = Commit.dateToString(new Date());
+                Commit commit = new Commit(args[1],date);
                 commit.updateCommit();
                 commit.commit();
                 break;
@@ -77,3 +79,4 @@ public class Main {
         }
     }
 }
+

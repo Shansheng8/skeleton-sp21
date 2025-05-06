@@ -27,7 +27,6 @@ public class Blob implements Serializable {
         }
         this.file = f;
         this.contents = readContentsAsString(f);
-        String content = readContentsAsString(f);
-        this.hashvalue = sha1(content);
+        this.hashvalue = sha1(this.contents);
     }
 }

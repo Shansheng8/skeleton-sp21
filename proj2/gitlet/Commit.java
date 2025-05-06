@@ -29,15 +29,17 @@ public class Commit implements Serializable {
 
     /** The message of this Commit. */
     public final String message;//log信息
-    public  String date;//创建时间
+    public final String date;//创建时间
     public  List<Commit> parents;//父提交
     public  Map<String, Blob> blobs;//被跟踪的文档（工作目录下）到.gitlet下存储的blob之间的映射
+    //专门用于checkout，从object目录下查找commit
+    public  String hashname;
     /* TODO: fill in the rest of this class. */
 
     /* 用于构建Commit实例 */
-    public Commit(String message) {
+    public Commit(String message, String date) {
         this.message = message;
-        this.date = dateToString(new Date());
+        this.date = date;
         this.parents = new ArrayList<>();
         this.blobs = new HashMap<>();
     }
@@ -61,7 +63,7 @@ public class Commit implements Serializable {
         List<String> rm = plainFilenamesIn(fr);
         if ((rm == null || rm.isEmpty()) && (addstage == null || addstage.isEmpty())) {
             System.out.println("No changes added to the commit.");
-            System.exit(0);
+            return;
         }
         if (rm != null) {
             for (String r : rm) {
@@ -76,15 +78,16 @@ public class Commit implements Serializable {
         }
     }
 
-    private static String dateToString(Date date) {
-        DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss 'UTC', EEEE, d MMMM yyyy", Locale.US);
+    public static String dateToString(Date date) {
+        DateFormat dateFormat = new SimpleDateFormat("EEE MMM d HH:mm:ss yyyy Z", Locale.US);
+        dateFormat.setTimeZone(TimeZone.getTimeZone("America/Los_Angeles"));
         return dateFormat.format(date);
     }
 
     /* 用于init */
     public static void initialCommit() {//初始化第一个commit
-        Commit init = new Commit("initial commit");
-        init.date = dateToString(new Date(0));
+        String date = dateToString(new Date(0));
+        Commit init = new Commit("initial commit",date);
         init.commit();
     }
 
@@ -101,6 +104,7 @@ public class Commit implements Serializable {
      */
     public void commit() {//传入commit，将commit保存到object目录中进行存储
         String filename = sha1(this.message,this.date,this.parents.toString(),this.blobs.toString());
+        this.hashname = filename;
         File f = join(Repository.GITLET_DIR,"object",filename);//通过SHA-1加密后的字符串作为文档的名称
         if (!f.exists()) {
             try {
