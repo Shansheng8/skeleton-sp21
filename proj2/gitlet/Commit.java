@@ -106,7 +106,12 @@ public class Commit implements Serializable {
         将其属性内容转为字符串后使用sha1加密得到对应的hash值，将该值作为文档名保存到object目录下
      */
     public void commit() {//传入commit，将commit保存到object目录中进行存储
-        String filename = sha1(this.message,this.date,this.parents.toString(),this.blobs.toString());
+        //令获得的sha1值唯一
+        String parent = "";
+        if (!this.parents.isEmpty()) {
+            parent = this.parents.get(0).hashname;
+        }
+        String filename = sha1(this.message,this.date,parent,this.blobs.toString());
         this.hashname = filename;
         File f = join(Repository.GITLET_DIR,"object",filename);//通过SHA-1加密后的字符串作为文档的名称
         if (!f.exists()) {
@@ -116,7 +121,10 @@ public class Commit implements Serializable {
             }
         }
         writeObject(f,this);//将commit的信息保存到对应名称为sha1字符串的文档中
-        f = join(Repository.GITLET_DIR,"ref/heads/master");//修改master分支的末端所指向的commit
+        f = join(Repository.GITLET_DIR,"ref","heads");//修改当前分支的末端所指向的commit
+        List<String> cur = plainFilenamesIn(f);
+        String curname = cur.get(0);
+        f = join(Repository.GITLET_DIR,"ref","heads",curname);
         writeContents(f,filename);
         f = join(Repository.GITLET_DIR,"HEAD");
         writeContents(f,filename);//修改HEAD指针指向的commit
@@ -124,7 +132,14 @@ public class Commit implements Serializable {
         f = join(Repository.GITLET_DIR,"addstage");
         List<String> add = plainFilenamesIn(f);
         for (String addname : add) {
-            f = join(f, addname);
+            f = join(Repository.GITLET_DIR,"addstage", addname);
+            restrictedDelete(f);
+        }
+        //清理rmstage区域
+        f = join(Repository.GITLET_DIR,"rmstage");
+        List<String> rm = plainFilenamesIn(f);
+        for (String rmname : rm) {
+            f = join(Repository.GITLET_DIR,"rmstage", rmname);
             restrictedDelete(f);
         }
     }

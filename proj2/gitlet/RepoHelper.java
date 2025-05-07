@@ -22,6 +22,26 @@ public class RepoHelper {
             修改完工作目录下的文档后HEAD应指向该branch（不应该提前修改），并且清空saddstage以及rmstage,如果切换了branch
      */
 
+    public static void clearStage(String content) {
+        //清空addstage
+        File f = join(GITLET_DIR,"addstage");
+        List<String> add = plainFilenamesIn(f);
+        for (String addname : add) {
+            f = join(GITLET_DIR,"addstage", addname);
+            restrictedDelete(f);
+        }
+        //清空rmstage
+        f = join(GITLET_DIR,"rmstage");
+        List<String> rm = plainFilenamesIn(f);
+        for (String rmname : rm) {
+            f = join(GITLET_DIR,"rmstage", rmname);
+            restrictedDelete(f);
+        }
+        //修改头指针
+        f = join(GITLET_DIR,"HEAD");
+        writeContents(f,content);
+    }
+
     public static void changeCWD(Commit commit) {
         Commit head = getHead();
         //先遍历CWD中的文档，
@@ -30,7 +50,10 @@ public class RepoHelper {
         Map<String,Blob> blobs = new HashMap<>(commit.blobs);//复制一份blobs，直接获取指针会影响本来的map
         for (int i = 0; i < filename.size(); i++) {
             String fname = filename.get(i);
-            boolean inHead = head.blobs.containsKey(fname), inCommit = commit.blobs.containsKey(fname);
+            File cwd = join(CWD, fname);
+            String content = readContentsAsString(cwd);
+            boolean inHead = head.blobs.containsKey(fname) && head.blobs.get(fname).contents.equals(content) ,
+                    inCommit = commit.blobs.containsKey(fname) && commit.blobs.get(fname).contents.equals(content);
             File f = join(CWD,fname);
             if (inHead && inCommit) {
                 writeContents(f,commit.blobs.get(fname).contents);
@@ -106,7 +129,11 @@ public class RepoHelper {
     public static boolean inCommit(Blob blob) {//检查该文档是否在当前HEAD指向的commit中
         Commit cur = getHead();//查找到当前指向的commit
         Map<String,Blob> blobs = cur.blobs;
-        return blobs.containsKey(blob.hashvalue);
+        if (blobs.containsKey(blob.filename)) {
+            return blobs.get(blob.filename).contents.equals(blob.contents);
+        }else {
+            return false;
+        }
     }
 
     public static boolean inAddStage(Blob blob) {//检查addstage中是否已经在addstage中
@@ -114,6 +141,17 @@ public class RepoHelper {
         List<String> addStage = plainFilenamesIn(addstage);
         for (String s : addStage) {
             if (s.equals(blob.hashvalue)) {//当前addstage中已经保存了该文档
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean inRmStage(Blob blob) {
+        File rmstage = join(Repository.GITLET_DIR, "rmstage");
+        List<String> rmStage = plainFilenamesIn(rmstage);
+        for (String s : rmStage) {
+            if (s.equals(blob.hashvalue)) {
                 return true;
             }
         }

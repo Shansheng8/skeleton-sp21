@@ -95,7 +95,7 @@ public class Repository {
     public static void addFile(String filename) {
         Blob blob = new Blob(filename);//通过传入的文档名创建对应的Blob实例
         //先检查当前commit中是否已经记录了该文档
-        boolean inCommit = inCommit(blob), inAddStage = inAddStage(blob);
+        boolean inCommit = inCommit(blob), inAddStage = inAddStage(blob), inRmStage = inRmStage(blob);
         if (inCommit) {
             if (inAddStage) {//同时在commit与addstage中应该删除addstage中的该文档
                 File f = join(GITLET_DIR, "addstage");
@@ -107,37 +107,66 @@ public class Repository {
                 addBlob(blob,f);
             }
         }
+        if (inRmStage) {
+            File f = join(GITLET_DIR, "rmstage");
+            rmBlob(blob,f);
+        }
         // 注意：object是存储提交后的commits以及blobs的，若没进行提交是不会存到object目录下的
     }
     /* 用与rm*/
     /*  删除文档有三种情况
+        若未被commit跟踪，也要删除CWD下的该文档
         第一种情况，当文档刚进addstage中不在当前head指向的commit中时,只需要删除addstage中的文档
         第二种情况，当文档在addstage也在当前head指向的commit中时，既需要删除addstage中的文档也要添加到rmstage中，以便于在下一次commit时记录
         第三种情况，当文档不在addstage但是在当前head指向的commit中时，需要添加到rmstage中
         第四种情况，都不在，报错
 
         是否要考虑rmstage已经添加了该文档？不需要rmstage的功能就是将已经被commit跟踪的blob进行删除
+        CWD下不存在的文档，但是被commit跟踪的也应该可以删除
      */
     public static void rmFile(String filename) {
-        Blob blob = new Blob(filename);
-        boolean inCommit = inCommit(blob), inAddStage = inAddStage(blob);
-        if (inCommit) {
-            if (inAddStage) {//文档在addstage也在当前head指向的commit中既需要删除addstage中的文档也要添加到rmstage中
-                File f = join(GITLET_DIR, "addstage");
-                rmBlob(blob,f);
-                f = join(GITLET_DIR, "rmstage");
-                addBlob(blob,f);
-            }else {//文档不在addstage但是在当前head指向的commit中时，需要添加到rmstage中
-                File f = join(GITLET_DIR, "rmstage");
-                addBlob(blob,f);
+        //先获取当前commit，查找被跟踪的blobs，看看有没有对应的file
+        Commit head = getHead();
+        File add = join(GITLET_DIR, "addstage");
+        List<String> addstage = plainFilenamesIn(add);
+        if (head.blobs.containsKey(filename)) {
+            for (String s : addstage) {
+                File f = join(GITLET_DIR, "addstage",s);
+                Blob blob = readObject(f, Blob.class);
+                //文档在addstage也在当前head指向的commit中既需要删除addstage中的文档也要添加到rmstage中
+                if (blob.filename.equals(filename)) {
+                    f = join(GITLET_DIR, "addstage");
+                    rmBlob(blob,f);
+                    f = join(GITLET_DIR, "rmstage");
+                    addBlob(blob,f);
+                    f = join(CWD,filename);
+                    if (f.exists()) {
+                        restrictedDelete(f);
+                    }
+                    return;
+                }
+            }
+            //文档不在addstage但是在当前head指向的commit中时，需要添加到rmstage中
+            Blob blob = head.blobs.get(filename);
+            File f = join(GITLET_DIR, "rmstage");
+            addBlob(blob,f);
+            f = join(CWD,filename);
+            if (f.exists()) {
+                restrictedDelete(f);
             }
         }else {
-            if (inAddStage) {//文档刚进addstage中不在当前head指向的commit中,只需要删除addstage中的文档
-                File f = join(GITLET_DIR, "addstage");
-                rmBlob(blob,f);
-            }else {//既不在addstage中也不在当前commit中，报错
-                System.out.println("No reason to remove the file.");
+            for (String s : addstage) {
+                File f = join(GITLET_DIR, "addstage",s);
+                Blob blob = readObject(f, Blob.class);
+                //文档刚进addstage中不在当前head指向的commit中,只需要删除addstage中的文档
+                if (blob.filename.equals(filename)) {
+                    f = join(GITLET_DIR, "addstage");
+                    rmBlob(blob,f);
+                    return;
+                }
             }
+            //既不在addstage中也不在当前commit中，报错
+            System.out.println("No reason to remove the file.");
         }
     }
     /* 用于log*/
@@ -204,7 +233,7 @@ public class Repository {
         printBranches();
         printStagedFiles();
         printRmedFiles();
-        System.out.println("=== Modifications Not Staged For Commit ===\n\n=== Untracked Files ===");
+        System.out.println("=== Modifications Not Staged For Commit ===\n\n=== Untracked Files ===\n");
     }
 
     private static void printBranches() {
@@ -283,70 +312,65 @@ public class Repository {
 
     public static void checkoutBranch(String branchname) {
         //branchname不是指指向的commit的hash值！
-        File f = join(GITLET_DIR,"ref","heads",branchname);
-        if (f.exists()) {
+        // 首先检查目标分支是否是当前分支（即是否在heads目录下）
+        File other = join(GITLET_DIR, "ref", "heads", branchname);
+        if (other.exists()) {
             System.out.println("No need to checkout the current branch.");
             System.exit(0);
         }
-        f = join(GITLET_DIR,"ref");
-        List<String> ref = plainFilenamesIn(f);
-        boolean flag = false;
-        //在指针目录下找到目标branch
-        for (String refname : ref) {
-            if (refname.equals(branchname)) {
-                flag = true;
-                f = join(GITLET_DIR,"ref",refname);
-                String commitname = readContentsAsString(f);
-                f = join(GITLET_DIR,"object",commitname);
-                Commit commit = readObject(f, Commit.class);
-                //修改CWD
-                changeCWD(commit);
 
-                //先将heads目录下的文档复制到ref目录下，再删除heads下的文档，将当前branch的文档写入
-                f  = join(GITLET_DIR,"ref","heads");
-                List<String> head = plainFilenamesIn(f);
-                String hd = head.get(0);//获取heads下文档的名称
-                //删除旧的head
-                f = join(GITLET_DIR,"ref","heads",hd);
-                String content = readContentsAsString(f);//获取heads下文档内容
-                restrictedDelete(f);//删除heads下的文档
-                //将旧head移到ref下
-                f = join(GITLET_DIR,"ref",hd);
-                try{
-                    f.createNewFile();
-                }catch (IOException ignore){}
-                writeContents(f,content);//在ref下复制一份heads下的文档
-                //删除ref下的branch
-                f = join(GITLET_DIR,"ref",branchname);
-                content = readContentsAsString(f);//获取要转到的branch的文档内容
-                restrictedDelete(f);//删除在ref下的该文档
-                //移动到heads下
-                f = join(GITLET_DIR,"ref","heads",branchname);
-                try{
-                    f.createNewFile();
-                }catch (IOException ignore){}
-                writeContents(f,content);//在heads下复制一份该branch的文档内容
-
-                //清空addstage
-                f = join(GITLET_DIR,"addstage");
-                List<String> add = plainFilenamesIn(f);
-                for (String addname : add) {
-                    f = join(f, addname);
-                    restrictedDelete(f);
-                }
-                //清空rmstage
-                f = join(GITLET_DIR,"rmstage");
-                List<String> rm = plainFilenamesIn(f);
-                for (String rmname : rm) {
-                    f = join(f, rmname);
-                    restrictedDelete(f);
-                }
-                break;
-            }
-        }
-        if (!flag) {
+        // 检查目标分支是否存在于ref目录下
+        other = join(GITLET_DIR, "ref", branchname);
+        if (!other.exists()) {
             System.out.println("No such branch exists.");
+            System.exit(0);
         }
+
+        // 读取目标分支指向的commit
+        String othercommit = readContentsAsString(other);
+        File commitFile = join(GITLET_DIR, "object", othercommit);
+        Commit otherCommit = readObject(commitFile, Commit.class);
+
+        // 修改工作目录
+        changeCWD(otherCommit);
+
+        // 获取当前分支（即heads目录下的文件）
+        File master = join(GITLET_DIR, "ref", "heads");
+        List<String> masterFiles = plainFilenamesIn(master);
+
+        if (masterFiles.isEmpty()) {
+            System.out.println("Fatal: no active branch found in heads directory.");
+            System.exit(0);
+        }
+
+        // 获取当前活动分支名称
+        String mastername = masterFiles.get(0);
+
+        // 从heads目录移除当前分支
+        master = join(GITLET_DIR, "ref", "heads", mastername);
+        String mastercontent = readContentsAsString(master);
+        restrictedDelete(master);//删除头文件
+
+        // 将当前分支移至ref目录
+        master = join(GITLET_DIR, "ref", mastername);
+        try {
+            master.createNewFile();
+        } catch (IOException ignore) {}
+        writeContents(master, mastercontent);
+
+        // 将目标分支从ref目录移除
+        restrictedDelete(other);
+
+        // 将目标分支移至heads目录
+        other = join(GITLET_DIR, "ref", "heads", branchname);
+        try {
+            other.createNewFile();
+        } catch (IOException ignore) {}
+        writeContents(other, otherCommit.hashname);
+
+        // 清空暂存区 并修改HEAD指向
+        clearStage(otherCommit.hashname);
+
     }
 
     /* 用于branch*/

@@ -24,7 +24,7 @@ public class Main {
                 Repository.addFile(args[1]);
                 break;
             case "commit":
-                if (args.length != 2) {
+                if (args.length != 2 || args[1].isEmpty()) {
                     System.out.println("Please enter a commit message.");
                     System.exit(0);
                 }
@@ -54,9 +54,17 @@ public class Main {
                         Repository.checkoutBranch(args[1]);
                         break;
                     case 3:
+                        if (!args[1].equals("--")) {
+                            System.out.println("Incorrect operands.");
+                            System.exit(0);
+                        }
                         Repository.checkoutFile(args[2]);
                         break;
                     case 4:
+                        if (!args[2].equals("--")) {
+                            System.out.println("Incorrect operands.");
+                            System.exit(0);
+                        }
                         Repository.checkoutCommitFile(args[1], args[3]);
                         break;
                 }

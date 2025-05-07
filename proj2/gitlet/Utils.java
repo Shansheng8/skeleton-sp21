@@ -73,6 +73,7 @@ class Utils {
         if (!file.isDirectory()) {
             return file.delete();
         } else {
+            System.out.println("must be a normal file");
             return false;
         }
     }
