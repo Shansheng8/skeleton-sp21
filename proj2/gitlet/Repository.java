@@ -2,9 +2,7 @@ package gitlet;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static gitlet.Utils.*;
 import static gitlet.RepoHelper.*;
@@ -424,5 +422,130 @@ public class Repository {
         changeCWD(commit);
         File head = join(GITLET_DIR,"HEAD");
         writeContents(head,commitid);
+    }
+
+    public static void merge(String branchname) {
+
+        //若当前stage中还有未提交的文档，报错
+        File addstage = join(GITLET_DIR,"addstage");
+        File rmstage = join(GITLET_DIR,"rmstage");
+        List<String> add = plainFilenamesIn(addstage);
+        List<String> rm = plainFilenamesIn(rmstage);
+        if (add == null || add.isEmpty() || rm == null || rm.isEmpty()) {
+            System.out.println("You have uncommitted changes.");
+            System.exit(0);
+        }
+        //若当前branch为要合并的分支，报错
+        File f = join(GITLET_DIR,"ref","heads",branchname);
+        if (f.exists()) {
+            System.out.println("Cannot merge a branch with itself.");
+            System.exit(0);
+        }else {
+            //若要合并的分支不存在，报错
+            f = join(GITLET_DIR,"ref",branchname);
+            if (!f.exists()) {
+                System.out.println("A branch with that name does not exist.");
+                System.exit(0);
+            }
+        }
+        //检查是否有未跟踪的文档，有则报错
+        Commit cur = getHead();
+        Commit other = readObject(f, Commit.class);
+        List<String> cwd = plainFilenamesIn(CWD);
+        if (cwd != null) {
+            for (String fname : cwd) {
+                File tmp = join(CWD, fname);
+                String content = readContentsAsString(tmp);
+                boolean inCur = cur.blobs.containsKey(fname) && cur.blobs.get(fname).contents.equals(content) ,
+                        inOther = other.blobs.containsKey(fname) && other.blobs.get(fname).contents.equals(content);
+                if (!inCur && !inOther) {
+                    System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+                    System.exit(0);
+                }
+            }
+        }
+
+        //先查询split point
+        Commit splitpoint =  findSplitPoint(other);
+        //若得到的splitpoint为cur 或 other 之一，即二者而在同一线性树上，直接处理
+        boolean iscur = splitpoint.hashname.equals(cur.hashname), isother = splitpoint.hashname.equals(other.hashname);
+        if (iscur && isother) {
+            System.out.println("No changes added to the commit.");
+            System.exit(0);
+        }else if (iscur) {//splitpoint为当前分支，
+            checkoutBranch(branchname);
+            System.out.println("Current branch fast-forwarded.");
+            System.exit(0);
+        }else if (isother) {
+            System.out.println("Given branch is an ancestor of the current branch.");
+            System.exit(0);
+        }
+
+        //处理第1、2、3-1、3-2、6、7种情况，此时splitpoint中该文档都存在
+        List<String> contentofCur = new ArrayList<>();
+        List<String> contentofOther = new ArrayList<>();
+        splitpoint.blobs.forEach((filename,blob) -> {
+            //6.检查是否在other中被删除,若被删除，则应该添加到rmstage中并且在CWD下被删除
+            if (!other.blobs.containsKey(filename)) {
+                File file = join(GITLET_DIR, "rmstage");
+                addBlob(blob,file);
+                file= join(CWD,filename);
+                if (file.exists()) {
+                    restrictedDelete(file);
+                }
+            }
+            //7.检查是否在cur下被删除，若被删除则不变
+            /*
+                1.cur下未修改，other下进行了修改，向addstage中添加该文档，并且checkout该文档（也就是进行添加）
+                2.cur下进行了修改，other下未进行修改，不进行操作
+                3.当两者都进行了修改,检查两者内容是否共同（也可以是同时被删除）
+                       -相同，不变
+                       -不同，报错
+             */
+            boolean changeInCur = cur.blobs.get(filename).contents.equals(blob.contents),
+                    chanegInOther = other.blobs.get(filename).contents.equals(blob.contents);
+            if (!changeInCur && chanegInOther) {
+                File file = join(GITLET_DIR,"addstage");
+                addBlob(blob,file);
+                checkoutFile(filename);
+            }else if (!changeInCur) {
+                if (!cur.blobs.get(filename).contents.equals(other.blobs.get(filename).contents)) {
+                    //发生冲突！
+                    contentofCur.add(cur.blobs.get(filename).contents);
+                    contentofOther.add(other.blobs.get(filename).contents);
+                }
+            }
+        });
+
+        //处理第4种情况,splitpoint下不存在但是cur下存在，不变
+        //处理第5种情况,splitpoint下不存在但是other下存在，变为other下
+        other.blobs.forEach((filename,blob) ->{
+            if (!splitpoint.blobs.containsKey(filename) && !cur.blobs.containsKey(filename)) {
+                File file = join(GITLET_DIR,"addstage");
+                addBlob(blob,file);
+                checkoutFile(filename);
+            }
+        });
+
+        //提交merge
+        if (contentofCur.isEmpty()) {
+            File head = join(GITLET_DIR,"ref","heads");
+            List<String> hd = plainFilenamesIn(head);
+            String date = Commit.dateToString(new Date());
+            assert hd != null;
+            Commit merge = new Commit("Merged "+ branchname +" into "+ hd.get(0) +".",date);
+            merge.commit();
+        }else {
+            System.out.println("Encountered a merge conflict.");
+            System.out.println("<<<<<<< HEAD");
+            for (String content : contentofCur) {
+                System.out.println(content);
+            }
+            System.out.println("=======");
+            for (String content : contentofOther) {
+                System.out.println(content);
+            }
+            System.out.println(">>>>>>>");
+        }
     }
 }

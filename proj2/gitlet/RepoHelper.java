@@ -2,9 +2,7 @@ package gitlet;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static gitlet.Utils.*;
 
@@ -180,5 +178,33 @@ public class RepoHelper {
         }
         File file = join(f,blob.hashvalue);
         restrictedDelete(file);
+    }
+
+    public static Commit findSplitPoint(Commit other) {
+        Commit cur = getHead();
+        Commit copyother = other;
+        List<Commit> curbranch = new ArrayList<>();
+        List<Commit> otherbranch = new ArrayList<>();
+        while (cur.parents != null) {
+            curbranch.add(cur.parents.get(0));
+            cur = cur.parents.get(0);
+        }
+        curbranch.add(cur);
+        while (copyother.parents != null) {
+            otherbranch.add(copyother.parents.get(0));
+            copyother = copyother.parents.get(0);
+        }
+        otherbranch.add(copyother);
+        ListIterator<Commit> it1 = curbranch.listIterator(curbranch.size());
+        ListIterator<Commit> it2 = otherbranch.listIterator(otherbranch.size());
+        while (it1.hasPrevious() && it2.hasPrevious()) {
+            Commit element1 = it1.previous();
+            Commit element2 = it2.previous();
+            if (!element1.hashname.equals(element2.hashname)) {
+                break;
+            }
+            cur = element1;
+        }
+        return cur;
     }
 }
