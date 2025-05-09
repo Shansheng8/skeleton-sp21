@@ -431,7 +431,7 @@ public class Repository {
         File rmstage = join(GITLET_DIR,"rmstage");
         List<String> add = plainFilenamesIn(addstage);
         List<String> rm = plainFilenamesIn(rmstage);
-        if (add == null || add.isEmpty() || rm == null || rm.isEmpty()) {
+        if ((add != null && !add.isEmpty()) || (rm != null && !rm.isEmpty())) {
             System.out.println("You have uncommitted changes.");
             System.exit(0);
         }
@@ -450,9 +450,11 @@ public class Repository {
         }
         //检查是否有未跟踪的文档，有则报错
         Commit cur = getHead();
+        String othername = readContentsAsString(f);
+        f = join(GITLET_DIR,"object",othername);
         Commit other = readObject(f, Commit.class);
         List<String> cwd = plainFilenamesIn(CWD);
-        if (cwd != null) {
+        if (cwd != null && !cwd.isEmpty()) {
             for (String fname : cwd) {
                 File tmp = join(CWD, fname);
                 String content = readContentsAsString(tmp);
@@ -493,8 +495,12 @@ public class Repository {
                 if (file.exists()) {
                     restrictedDelete(file);
                 }
+                return;
             }
             //7.检查是否在cur下被删除，若被删除则不变
+            if (!cur.blobs.containsKey(filename)) {
+                return;
+            }
             /*
                 1.cur下未修改，other下进行了修改，向addstage中添加该文档，并且checkout该文档（也就是进行添加）
                 2.cur下进行了修改，other下未进行修改，不进行操作
@@ -503,8 +509,8 @@ public class Repository {
                        -不同，报错
              */
             boolean changeInCur = cur.blobs.get(filename).contents.equals(blob.contents),
-                    chanegInOther = other.blobs.get(filename).contents.equals(blob.contents);
-            if (!changeInCur && chanegInOther) {
+                    changeInOther = other.blobs.get(filename).contents.equals(blob.contents);
+            if (!changeInCur && changeInOther) {
                 File file = join(GITLET_DIR,"addstage");
                 addBlob(blob,file);
                 checkoutFile(filename);
@@ -523,7 +529,14 @@ public class Repository {
             if (!splitpoint.blobs.containsKey(filename) && !cur.blobs.containsKey(filename)) {
                 File file = join(GITLET_DIR,"addstage");
                 addBlob(blob,file);
-                checkoutFile(filename);
+                //checkoutFile(filename);只会查询curbranch下，会报错,需要使用新方法向CWD下添加文档
+                file= join(CWD,filename);
+                try {
+                    if (!file.exists()) {
+                        file.createNewFile();
+                    }
+                    writeContents(file, blob.contents);
+                } catch (IOException ignore) {}
             }
         });
 
@@ -534,6 +547,8 @@ public class Repository {
             String date = Commit.dateToString(new Date());
             assert hd != null;
             Commit merge = new Commit("Merged "+ branchname +" into "+ hd.get(0) +".",date);
+            merge.updateCommit();
+            merge.parents.add(other);
             merge.commit();
         }else {
             System.out.println("Encountered a merge conflict.");

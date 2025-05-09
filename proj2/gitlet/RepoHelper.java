@@ -46,26 +46,29 @@ public class RepoHelper {
         // 复制一个commit跟踪的blobs，如果该文档在被跟踪的blobs中则将复制的blobs中的该文档删除
         List<String> filename = plainFilenamesIn(CWD);
         Map<String,Blob> blobs = new HashMap<>(commit.blobs);//复制一份blobs，直接获取指针会影响本来的map
-        for (int i = 0; i < filename.size(); i++) {
-            String fname = filename.get(i);
-            File cwd = join(CWD, fname);
-            String content = readContentsAsString(cwd);
-            boolean inHead = head.blobs.containsKey(fname) && head.blobs.get(fname).contents.equals(content) ,
-                    inCommit = commit.blobs.containsKey(fname) && commit.blobs.get(fname).contents.equals(content);
-            File f = join(CWD,fname);
-            if (inHead && inCommit) {
-                writeContents(f,commit.blobs.get(fname).contents);
-                blobs.remove(fname);
-            }else if (inHead) {
-                restrictedDelete(f);
-            }else if (inCommit) {
-                writeContents(f,commit.blobs.get(fname).contents);
-                blobs.remove(fname);
-            }else {//两者都未进行跟踪，报错
-                System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
-                System.exit(0);
+        if (filename != null) {
+            for (String fname : filename) {
+                File cwd = join(CWD, fname);
+                String content = readContentsAsString(cwd);
+                //需要通过blobs的hash值才能进行判断
+                boolean inHead = head.blobs.containsKey(fname) && head.blobs.get(fname).contents.equals(content) ,
+                        inCommit = commit.blobs.containsKey(fname) && commit.blobs.get(fname).contents.equals(content);
+                File f = join(CWD,fname);
+                if (inHead && inCommit) {
+                    writeContents(f,commit.blobs.get(fname).contents);
+                    blobs.remove(fname);
+                }else if (inHead) {
+                    restrictedDelete(f);
+                }else if (inCommit) {
+                    writeContents(f,commit.blobs.get(fname).contents);
+                    blobs.remove(fname);
+                }else {//两者都未进行跟踪，报错
+                    System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+                    System.exit(0);
+                }
             }
         }
+
         //若当前branch跟踪了但是CWD中没有还得进行添加
         blobs.forEach((k,v)->{
             File f = join(CWD,k);
@@ -134,26 +137,24 @@ public class RepoHelper {
         }
     }
 
-    public static boolean inAddStage(Blob blob) {//检查addstage中是否已经在addstage中
-        File addstage = join(Repository.GITLET_DIR, "addstage");
-        List<String> addStage = plainFilenamesIn(addstage);
-        for (String s : addStage) {
-            if (s.equals(blob.hashvalue)) {//当前addstage中已经保存了该文档
-                return true;
-            }
+    public static boolean inAddStage(Blob blob) {//检查blob中是否已经在addstage中
+        File addstage = join(Repository.GITLET_DIR, "addstage",blob.filename);
+        if (addstage.exists()) {
+            String content = readContentsAsString(addstage);
+            return content.equals(blob.contents);
+        }else {
+            return false;
         }
-        return false;
     }
 
     public static boolean inRmStage(Blob blob) {
-        File rmstage = join(Repository.GITLET_DIR, "rmstage");
-        List<String> rmStage = plainFilenamesIn(rmstage);
-        for (String s : rmStage) {
-            if (s.equals(blob.hashvalue)) {
-                return true;
-            }
+        File rmstage = join(Repository.GITLET_DIR, "rmstage",blob.filename);
+        if (rmstage.exists()) {
+            String content = readContentsAsString(rmstage);
+            return content.equals(blob.contents);
+        }else {
+            return false;
         }
-        return false;
     }
 
     public static void addBlob(Blob blob, File f) {//f对应需要保存到的目录的路径
@@ -185,12 +186,12 @@ public class RepoHelper {
         Commit copyother = other;
         List<Commit> curbranch = new ArrayList<>();
         List<Commit> otherbranch = new ArrayList<>();
-        while (cur.parents != null) {
+        while (cur.parents != null && !cur.parents.isEmpty()) {
             curbranch.add(cur.parents.get(0));
             cur = cur.parents.get(0);
         }
         curbranch.add(cur);
-        while (copyother.parents != null) {
+        while (copyother.parents != null && !copyother.parents.isEmpty()) {
             otherbranch.add(copyother.parents.get(0));
             copyother = copyother.parents.get(0);
         }
