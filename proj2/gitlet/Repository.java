@@ -484,8 +484,6 @@ public class Repository {
         }
 
         //处理第1、2、3-1、3-2、6、7种情况，此时splitpoint中该文档都存在
-        List<String> contentofCur = new ArrayList<>();
-        List<String> contentofOther = new ArrayList<>();
         splitpoint.blobs.forEach((filename,blob) -> {
             //6.检查是否在other中被删除,若被删除，则应该添加到rmstage中并且在CWD下被删除
             if (!other.blobs.containsKey(filename)) {
@@ -517,8 +515,17 @@ public class Repository {
             }else if (!changeInCur) {
                 if (!cur.blobs.get(filename).contents.equals(other.blobs.get(filename).contents)) {
                     //发生冲突！
-                    contentofCur.add(cur.blobs.get(filename).contents);
-                    contentofOther.add(other.blobs.get(filename).contents);
+                    String content = "<<<<<<< HEAD\n";
+                    content += cur.blobs.get(filename).contents;
+                    content += "\n=======";
+                    content += other.blobs.get(filename).contents;
+                    content += "\n>>>>>>>";
+                    String name = sha1(content,filename);
+                    blob.hashvalue = name;
+                    blob.contents = content;
+                    File file = join(GITLET_DIR,"addstage",name);
+                    addBlob(blob,file);
+                    System.out.println("Encountered a merge conflict.");
                 }
             }
         });
@@ -541,26 +548,14 @@ public class Repository {
         });
 
         //提交merge
-        if (contentofCur.isEmpty()) {
-            File head = join(GITLET_DIR,"ref","heads");
-            List<String> hd = plainFilenamesIn(head);
-            String date = Commit.dateToString(new Date());
-            assert hd != null;
-            Commit merge = new Commit("Merged "+ branchname +" into "+ hd.get(0) +".",date);
-            merge.updateCommit();
-            merge.parents.add(other);
-            merge.commit();
-        }else {
-            System.out.println("Encountered a merge conflict.");
-            System.out.println("<<<<<<< HEAD");
-            for (String content : contentofCur) {
-                System.out.println(content);
-            }
-            System.out.println("=======");
-            for (String content : contentofOther) {
-                System.out.println(content);
-            }
-            System.out.println(">>>>>>>");
-        }
+
+        File head = join(GITLET_DIR,"ref","heads");
+        List<String> hd = plainFilenamesIn(head);
+        String date = Commit.dateToString(new Date());
+        assert hd != null;
+        Commit merge = new Commit("Merged "+ branchname +" into "+ hd.get(0) +".",date);
+        merge.updateCommit();
+        merge.parents.add(other);
+        merge.commit();
     }
 }

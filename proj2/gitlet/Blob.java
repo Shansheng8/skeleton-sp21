@@ -13,10 +13,10 @@ import static gitlet.Utils.*;
     这就是Blob类被定义出来的意义
  */
 public class Blob implements Serializable {
-    public final String filename;
-    public final File file;//文档对应路径(工作路径)
-    public final String hashvalue;//文档内容的hash值
-    public final String contents;//文档内容
+    public String filename;
+    public File file;//文档对应路径(工作路径)
+    public String hashvalue;//文档内容的hash值
+    public  String contents;//文档内容
 
     public Blob(String filename) {
         this.filename = filename;
