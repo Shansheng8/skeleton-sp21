@@ -22,15 +22,11 @@ public class RepoHelper {
 
     public static void conflict(Commit cur, Commit other, String filename, Blob blob) {
         String content = "<<<<<<< HEAD\n";
-        if (!cur.blobs.containsKey(filename)) {
-            content += "\n";
-        }else {
+        if (cur.blobs.containsKey(filename)) {
             content += cur.blobs.get(filename).contents;
         }
         content += "=======\n";
-        if (!other.blobs.containsKey(filename)) {
-            content += "\n";
-        }else {
+        if (other.blobs.containsKey(filename)) {
             content += other.blobs.get(filename).contents;
         }
         content += ">>>>>>>";
@@ -171,23 +167,13 @@ public class RepoHelper {
     }
 
     public static boolean inAddStage(Blob blob) {//检查blob中是否已经在addstage中
-        File addstage = join(Repository.GITLET_DIR, "addstage",blob.filename);
-        if (addstage.exists()) {
-            String content = readContentsAsString(addstage);
-            return content.equals(blob.contents);
-        }else {
-            return false;
-        }
+        File addstage = join(Repository.GITLET_DIR, "addstage",blob.hashvalue);
+        return addstage.exists();
     }
 
     public static boolean inRmStage(Blob blob) {
-        File rmstage = join(Repository.GITLET_DIR, "rmstage",blob.filename);
-        if (rmstage.exists()) {
-            String content = readContentsAsString(rmstage);
-            return content.equals(blob.contents);
-        }else {
-            return false;
-        }
+        File rmstage = join(Repository.GITLET_DIR, "rmstage",blob.hashvalue);
+        return rmstage.exists();
     }
 
     public static void addBlob(Blob blob, File f) {//f对应需要保存到的目录的路径
