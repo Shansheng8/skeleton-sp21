@@ -20,6 +20,32 @@ public class RepoHelper {
             修改完工作目录下的文档后HEAD应指向该branch（不应该提前修改），并且清空saddstage以及rmstage,如果切换了branch
      */
 
+    public static void conflict(Commit cur, Commit other, String filename, Blob blob) {
+        String content = "<<<<<<< HEAD\n";
+        if (!cur.blobs.containsKey(filename)) {
+            content += "\n";
+        }else {
+            content += cur.blobs.get(filename).contents;
+        }
+        content += "=======\n";
+        if (!other.blobs.containsKey(filename)) {
+            content += "\n";
+        }else {
+            content += other.blobs.get(filename).contents;
+        }
+        content += ">>>>>>>";
+        String name = sha1(content,filename);
+        blob.hashvalue = name;
+        blob.contents = content;
+        File file = join(GITLET_DIR,"addstage");
+        addBlob(blob,file);
+        file= join(CWD,filename);
+        if (!file.exists()) {
+            System.out.println("A file with that name does not exist.");
+        }
+        writeContents(file,content);
+    }
+
     public static void clearStage(String content) {
         //清空addstage
         File f = join(GITLET_DIR,"addstage");
@@ -40,6 +66,7 @@ public class RepoHelper {
         writeContents(f,content);
     }
 
+
     public static void changeCWD(Commit commit) {
         Commit head = getHead();
         //先遍历CWD中的文档，
@@ -51,21 +78,27 @@ public class RepoHelper {
                 File cwd = join(CWD, fname);
                 String content = readContentsAsString(cwd);
                 //需要通过blobs的hash值才能进行判断
-                boolean inHead = head.blobs.containsKey(fname) && head.blobs.get(fname).contents.equals(content) ,
-                        inCommit = commit.blobs.containsKey(fname) && commit.blobs.get(fname).contents.equals(content);
+                boolean inHead = head.blobs.containsKey(fname),
+                        inCommit = commit.blobs.containsKey(fname);
                 File f = join(CWD,fname);
-                if (inHead && inCommit) {
-                    writeContents(f,commit.blobs.get(fname).contents);
+                //获取CWD下的所有文档名
+                if (inHead && inCommit) {//该文档名在cur 跟 other下都存在
+                    //若内容与other不同则修改版本
+                    if (!commit.blobs.get(fname).contents.equals(content)) {
+                        writeContents(f,commit.blobs.get(fname).contents);
+                    }
                     blobs.remove(fname);
-                }else if (inHead) {
+                }else if (inHead) {//该文档名不在other中
                     restrictedDelete(f);
-                }else if (inCommit) {
-                    writeContents(f,commit.blobs.get(fname).contents);
-                    blobs.remove(fname);
-                }else {//两者都未进行跟踪，报错
-                    System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
-                    System.exit(0);
-                }
+                }else if (inCommit) {//该文档名在other中
+                    if (!commit.blobs.get(fname).contents.equals(content)){//未被cur跟踪并且内容与other中不一样，会被覆盖，报错
+                        System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+                        System.exit(0);
+                    }else {
+                        writeContents(f,commit.blobs.get(fname).contents);
+                        blobs.remove(fname);
+                    }
+                }//该文档名两者都不在
             }
         }
 
@@ -182,30 +215,30 @@ public class RepoHelper {
     }
 
     public static Commit findSplitPoint(Commit other) {
-        Commit cur = getHead();
-        Commit copyother = other;
-        List<Commit> curbranch = new ArrayList<>();
-        List<Commit> otherbranch = new ArrayList<>();
-        while (cur.parents != null && !cur.parents.isEmpty()) {
-            curbranch.add(cur.parents.get(0));
-            cur = cur.parents.get(0);
+        Commit head = getHead();
+
+        // 使用HashSet存储另一个分支的所有提交的hashname
+        Set<String> otherBranchCommits = new HashSet<>();
+        Commit current = other;
+        otherBranchCommits.add(current.hashname);
+        while (current.parents != null && !current.parents.isEmpty()) {
+            current = current.parents.get(0);
+            otherBranchCommits.add(current.hashname);
         }
-        curbranch.add(cur);
-        while (copyother.parents != null && !copyother.parents.isEmpty()) {
-            otherbranch.add(copyother.parents.get(0));
-            copyother = copyother.parents.get(0);
+
+        // 从当前分支的头部开始，找到第一个也在另一个分支中的提交
+        current = head;
+        if (otherBranchCommits.contains(current.hashname)) {
+            return current;
         }
-        otherbranch.add(copyother);
-        ListIterator<Commit> it1 = curbranch.listIterator(curbranch.size());
-        ListIterator<Commit> it2 = otherbranch.listIterator(otherbranch.size());
-        while (it1.hasPrevious() && it2.hasPrevious()) {
-            Commit element1 = it1.previous();
-            Commit element2 = it2.previous();
-            if (!element1.hashname.equals(element2.hashname)) {
-                break;
+
+        while (current.parents != null && !current.parents.isEmpty()) {
+            current = current.parents.get(0);
+            if (otherBranchCommits.contains(current.hashname)) {
+                return current;
             }
-            cur = element1;
         }
-        return cur;
+
+        return null; // 如果没有找到共同祖先
     }
 }

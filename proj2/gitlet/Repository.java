@@ -228,6 +228,10 @@ public class Repository {
     }
 
     public static void status() {
+        if (!GITLET_DIR.exists()) {
+            System.out.println("Not in an initialized Gitlet directory.");
+            System.exit(0);
+        }
         printBranches();
         printStagedFiles();
         printRmedFiles();
@@ -422,10 +426,29 @@ public class Repository {
         changeCWD(commit);
         File head = join(GITLET_DIR,"HEAD");
         writeContents(head,commitid);
+        //修改当前分支的指针
+        f = join(GITLET_DIR,"ref","heads");
+        List<String> headFiles = plainFilenamesIn(f);
+        f = join(GITLET_DIR,"ref","heads",headFiles.get(0));
+        writeContents(f,commitid);
+        //清理addstage区域
+        f = join(Repository.GITLET_DIR,"addstage");
+        List<String> add = plainFilenamesIn(f);
+        for (String addname : add) {
+            f = join(Repository.GITLET_DIR,"addstage", addname);
+            restrictedDelete(f);
+        }
+        //清理rmstage区域
+        f = join(Repository.GITLET_DIR,"rmstage");
+        List<String> rm = plainFilenamesIn(f);
+        for (String rmname : rm) {
+            f = join(Repository.GITLET_DIR,"rmstage", rmname);
+            restrictedDelete(f);
+        }
     }
 
     public static void merge(String branchname) {
-
+        boolean flag = false;
         //若当前stage中还有未提交的文档，报错
         File addstage = join(GITLET_DIR,"addstage");
         File rmstage = join(GITLET_DIR,"rmstage");
@@ -469,6 +492,8 @@ public class Repository {
 
         //先查询split point
         Commit splitpoint =  findSplitPoint(other);
+        f = join(GITLET_DIR,"object",othername);
+        other = readObject(f, Commit.class);
         //若得到的splitpoint为cur 或 other 之一，即二者而在同一线性树上，直接处理
         boolean iscur = splitpoint.hashname.equals(cur.hashname), isother = splitpoint.hashname.equals(other.hashname);
         if (iscur && isother) {
@@ -484,20 +509,34 @@ public class Repository {
         }
 
         //处理第1、2、3-1、3-2、6、7种情况，此时splitpoint中该文档都存在
-        splitpoint.blobs.forEach((filename,blob) -> {
+        for (Map.Entry<String, Blob> entry : splitpoint.blobs.entrySet()) {
+            String filename = entry.getKey();
+            Blob blob = entry.getValue();
             //6.检查是否在other中被删除,若被删除，则应该添加到rmstage中并且在CWD下被删除
             if (!other.blobs.containsKey(filename)) {
+                //发生冲突
+                if (cur.blobs.containsKey(filename) && !cur.blobs.get(filename).contents.equals(blob.contents)) {
+                    conflict(cur, other, filename, blob);
+                    flag = true;
+                    continue;
+                }
                 File file = join(GITLET_DIR, "rmstage");
-                addBlob(blob,file);
-                file= join(CWD,filename);
+                addBlob(blob, file);
+                file = join(CWD, filename);
                 if (file.exists()) {
                     restrictedDelete(file);
                 }
-                return;
+                continue;
             }
             //7.检查是否在cur下被删除，若被删除则不变
             if (!cur.blobs.containsKey(filename)) {
-                return;
+                //发生冲突
+                if (other.blobs.containsKey(filename) && !other.blobs.get(filename).contents.equals(blob.contents)) {
+                    conflict(cur, other, filename, blob);
+                    flag = true;
+                    continue;
+                }
+                continue;
             }
             /*
                 1.cur下未修改，other下进行了修改，向addstage中添加该文档，并且checkout该文档（也就是进行添加）
@@ -509,30 +548,23 @@ public class Repository {
             boolean changeInCur = cur.blobs.get(filename).contents.equals(blob.contents),
                     changeInOther = other.blobs.get(filename).contents.equals(blob.contents);
             if (!changeInCur && changeInOther) {
-                File file = join(GITLET_DIR,"addstage");
-                addBlob(blob,file);
+                File file = join(GITLET_DIR, "addstage");
+                addBlob(blob, file);
                 checkoutFile(filename);
-            }else if (!changeInCur) {
+            } else if (!changeInCur) {
                 if (!cur.blobs.get(filename).contents.equals(other.blobs.get(filename).contents)) {
                     //发生冲突！
-                    String content = "<<<<<<< HEAD\n";
-                    content += cur.blobs.get(filename).contents;
-                    content += "\n=======";
-                    content += other.blobs.get(filename).contents;
-                    content += "\n>>>>>>>";
-                    String name = sha1(content,filename);
-                    blob.hashvalue = name;
-                    blob.contents = content;
-                    File file = join(GITLET_DIR,"addstage",name);
-                    addBlob(blob,file);
-                    System.out.println("Encountered a merge conflict.");
+                    conflict(cur, other, filename, blob);
+                    flag = true;
                 }
             }
-        });
+        }
 
         //处理第4种情况,splitpoint下不存在但是cur下存在，不变
         //处理第5种情况,splitpoint下不存在但是other下存在，变为other下
-        other.blobs.forEach((filename,blob) ->{
+        for (Map.Entry<String, Blob> entry : other.blobs.entrySet()) {
+            String filename = entry.getKey();
+            Blob blob = entry.getValue();
             if (!splitpoint.blobs.containsKey(filename) && !cur.blobs.containsKey(filename)) {
                 File file = join(GITLET_DIR,"addstage");
                 addBlob(blob,file);
@@ -545,9 +577,17 @@ public class Repository {
                     writeContents(file, blob.contents);
                 } catch (IOException ignore) {}
             }
-        });
+            //冲突情况
+            if (cur.blobs.containsKey(filename) && !cur.blobs.get(filename).contents.equals(blob.contents)) {
+                conflict(cur,other,filename,blob);
+                flag = true;
+            }
+        }
 
         //提交merge
+        if (flag) {
+            System.out.println("Encountered a merge conflict.");
+        }
 
         File head = join(GITLET_DIR,"ref","heads");
         List<String> hd = plainFilenamesIn(head);
