@@ -545,13 +545,15 @@ public class Repository {
                        -相同，不变
                        -不同，报错
              */
-            boolean changeInCur = cur.blobs.get(filename).contents.equals(blob.contents),
-                    changeInOther = other.blobs.get(filename).contents.equals(blob.contents);
+            boolean changeInCur = !cur.blobs.get(filename).contents.equals(blob.contents),
+                    changeInOther = !other.blobs.get(filename).contents.equals(blob.contents);
             if (!changeInCur && changeInOther) {
                 File file = join(GITLET_DIR, "addstage");
-                addBlob(blob, file);
-                checkoutFile(filename);
-            } else if (!changeInCur) {
+                addBlob(other.blobs.get(filename), file);
+                file = join(CWD, filename);
+                writeContents(file, other.blobs.get(filename).contents);
+            }
+            if (changeInCur && changeInOther) {
                 if (!cur.blobs.get(filename).contents.equals(other.blobs.get(filename).contents)) {
                     //发生冲突！
                     conflict(cur, other, filename, blob);
@@ -560,7 +562,17 @@ public class Repository {
             }
         }
 
-        //处理第4种情况,splitpoint下不存在但是cur下存在，不变
+        //处理第4种情况,splitpoint下不存在但是cur下存在，不变 特殊情况：当前branch末端为merge commit
+        for (Map.Entry<String, Blob> entry : cur.blobs.entrySet()) {
+            String filename = entry.getKey();
+            if (cur.parents.size() == 2) {
+                if (cur.parents.get(1).blobs.containsKey(filename) &&
+                    !other.blobs.containsKey(filename)) {
+                    File file = join(CWD, filename);
+                    restrictedDelete(file);
+                }
+            }
+        }
         //处理第5种情况,splitpoint下不存在但是other下存在，变为other下
         for (Map.Entry<String, Blob> entry : other.blobs.entrySet()) {
             String filename = entry.getKey();
@@ -576,11 +588,12 @@ public class Repository {
                     }
                     writeContents(file, blob.contents);
                 } catch (IOException ignore) {}
-            }
-            //冲突情况
-            if (cur.blobs.containsKey(filename) && !cur.blobs.get(filename).contents.equals(blob.contents)) {
-                conflict(cur,other,filename,blob);
-                flag = true;
+
+                //冲突情况
+                if (cur.blobs.containsKey(filename) && !cur.blobs.get(filename).contents.equals(blob.contents)) {
+                    conflict(cur,other,filename,blob);
+                    flag = true;
+                }
             }
         }
 
