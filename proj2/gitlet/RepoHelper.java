@@ -29,7 +29,7 @@ public class RepoHelper {
         if (other.blobs.containsKey(filename)) {
             content += other.blobs.get(filename).contents;
         }
-        content += ">>>>>>>";
+        content += ">>>>>>>\n";
         String name = sha1(content,filename);
         blob.hashvalue = name;
         blob.contents = content;
